@@ -1,1 +1,4 @@
-python-chess==1.11.2
+chess==1.11.2
+zstandard==0.23.0
+tqdm==4.67.1
+numpy==2.2.0

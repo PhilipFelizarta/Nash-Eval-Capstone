@@ -2,74 +2,79 @@ import chess
 import chess.pgn
 import re
 import json
+import zstandard as zstd
+import os
+from tqdm import tqdm
+import io
 
-def extract_evaluation(comment):
-	"""Extracts evaluation score from a PGN comment."""
-	eval_match = re.search(r"\[%eval (-?\d+(\.\d+)?)\]", comment)
-	if eval_match:
-		return float(eval_match.group(1))
-	return None
+def extract_game_result(headers):
+	result =  headers.get("Result", "*")
 
-def extract_clock_time(comment):
-	"""Extracts clock time from a PGN comment."""
-	clock_match = re.search(r"\[%clk (\d+):(\d+):(\d+)\]", comment)
-	if clock_match:
-		hours, minutes, seconds = map(int, clock_match.groups())
-		return hours * 3600 + minutes * 60 + seconds
-	clock_match = re.search(r"\[%clk (\d+):(\d+)\]", comment)  # Format mm:ss
-	if clock_match:
-		minutes, seconds = map(int, clock_match.groups())
-		return minutes * 60 + seconds
-	return None
-
-def process_pgn(pgn_file):
-	"""Processes a PGN file and extracts training examples from each game."""
-	examples = []
-	with open(pgn_file, 'r', encoding='utf-8') as file:
-		game = chess.pgn.read_game(file)
-
-		while game:
-			board = game.board()
-			move_number = 1
-			node = game
-
-			while node.variations:
-				next_node = node.variation(0)
-				move = next_node.move
-
-				# Extract metadata
-				fen = board.fen()
-				move_uci = move.uci()
-				eval_score = extract_evaluation(next_node.comment)
-				clock_time = extract_clock_time(next_node.comment)
-
-				# Create an example
-				example = {
-					"move_number": move_number,
-					"fen": fen,
-					"move": move_uci,
-					"evaluation": eval_score,
-					"clock_time": clock_time
-				}
-				examples.append(example)
-
-				# Make the move on the board
-				board.push(move)
-				move_number += 1
-
-				# Advance to the next node
-				node = next_node
-
-			# Read the next game in the PGN file
-			game = chess.pgn.read_game(file)
-
-	return examples
-
-def pgn_to_json(pgn_file, json_name):
-	examples = process_pgn(pgn_file)
+	if result == "1-0": # White win
+		return 1
+	elif result == "0-1": # Black win
+		return -1
+	elif result =="1/2-1/2": # Draw
+		return 0
 	
-	# Save as JSON for easy loading
-	with open(f"{json_name}.json", "w", encoding="utf-8") as f:
-		json.dump(examples, f, indent=4)
+	return 2 # Incomplete game
 
-	print(f"Processed {len(examples)} positions and saved to chess_data.json")
+def process_pgn_stream(file_obj, output_folder, max_games):
+	"""Processes a PGN stream from a file-like object and saves up to `max_games` as JSON."""
+	os.makedirs(output_folder, exist_ok=True)  # Ensure output folder exists
+
+	text_stream = io.TextIOWrapper(file_obj, encoding="utf-8")
+
+	for game_index in tqdm(range(max_games), desc="Processing Games"):
+		game = chess.pgn.read_game(text_stream)
+		if game is None:
+			print("End of PGN file reached.")
+			break  # No more games available
+
+		board = game.board()
+		move_number = 1
+		node = game
+		game_result = extract_game_result(game.headers)
+
+		game_data = []  # Store positions for this game
+
+		while node.variations:
+			next_node = node.variation(0)
+			move = next_node.move
+
+			# Extract metadata
+			fen = board.fen()
+			move_uci = move.uci()
+			# Save position details
+			example = {
+				"move_number": move_number,
+				"fen": fen,
+				"move": move_uci,
+				"game_result": game_result
+			}
+			game_data.append(example)
+
+			# Make the move on the board
+			board.push(move)
+			move_number += 1
+
+			# Advance to the next node
+			node = next_node
+
+		# Save each game to a separate JSON file
+		json_filename = os.path.join(output_folder, f"game_{game_index}.json")
+		with open(json_filename, "w", encoding="utf-8") as f:
+			json.dump(game_data, f, indent=4)
+
+	print(f"Saved {game_index + 1} games to {output_folder}")
+
+def pgn_zst_to_json(zst_file, output_folder, max_games=1000):
+	"""Reads a .pgn.zst file, extracts PGNs, and saves each game as a separate JSON file."""
+	dctx = zstd.ZstdDecompressor()
+
+	with open(zst_file, "rb") as compressed:
+		with dctx.stream_reader(compressed) as reader:
+			process_pgn_stream(reader, output_folder, max_games)
+
+# Example usage:
+pgn_zst_to_json("data/lichess_db_standard_rated_2013-01.pgn.zst", "fen_data/", max_games=1)
