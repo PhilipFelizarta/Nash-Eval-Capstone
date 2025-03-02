@@ -3,7 +3,7 @@ import chess.pgn
 import zstandard as zstd
 import io
 import tensorflow as tf
-import chess_environment as chess_env
+import core.chess_environment as chess_env
 
 def extract_game_result(headers):
 	"""Extracts game result from PGN headers and avoids incomplete games."""
