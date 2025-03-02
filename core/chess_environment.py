@@ -12,25 +12,25 @@ from matplotlib.colors import ListedColormap
 
 def fast_fen_to_example(fen):
 	"""
-	Converts a FEN string into a (8, 8, 17) tensor where:
-		- First 6 channels: Current player's pieces
-		- Channels 7 & 8: Current player's kingside & queenside castling rights
-		- Next 6 channels: Opponent's pieces
-		- Channels 15 & 16: Opponent's kingside & queenside castling rights
-		- Channel 17 encodes a bit for the en passant square
+	Converts a FEN string into a (8, 8, 19) tensor where:
+		- First 7 channels: Current player's pieces
+		- Channels 8 & 9: Current player's kingside & queenside castling rights
+		- Next 7 channels: Opponent's pieces
+		- Channels 17 & 18: Opponent's kingside & queenside castling rights
+		- Channel 19 encodes a bit for the en passant square
 		- Board flips when black to move to maintain hero/villian representation.
 
 	Args:
 		fen (str): Chess position in FEN notation.
 
 	Returns:
-		np.ndarray: (8, 8, 17) tensor representation of the board.
+		np.ndarray: (8, 8, 19) tensor representation of the board.
 	"""
-	tensor = np.zeros((8, 8, 17), dtype=np.float32)
+	tensor = np.zeros((8, 8, 19), dtype=np.float32)
 
 	# Define piece mappings (relative to current player)
-	piece_map = {"P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5}
-	opponent_offset = 8  # Opponent pieces stored at index 8+
+	piece_map = {"P": 0, "N": 1, "B": 2, "R": 4, "Q": 5, "K": 6}
+	opponent_offset = 9  # Opponent pieces stored at index 9+
 
 	# Split FEN into components
 	parts = fen.split()
@@ -49,6 +49,9 @@ def fast_fen_to_example(fen):
 			else:
 				piece_index = piece_map.get(char.upper(), None)
 				if piece_index is not None:
+					if char.upper() == "B":
+						piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
+			
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player
 					else:
@@ -56,27 +59,28 @@ def fast_fen_to_example(fen):
 				col_idx += 1
 
 	# Encode castling rights
-	tensor[:, :, 6] = 'K' in castling_rights if is_white_turn else 'k' in castling_rights  # Kingside castling
-	tensor[:, :, 7] = 'Q' in castling_rights if is_white_turn else 'q' in castling_rights  # Queenside castling
-	tensor[:, :, 6 + opponent_offset] = 'k' in castling_rights if is_white_turn else 'K' in castling_rights  # Opponent kingside
-	tensor[:, :, 7 + opponent_offset] = 'q' in castling_rights if is_white_turn else 'Q' in castling_rights  # Opponent queenside
+	tensor[:, :, 7] = 'K' in castling_rights if is_white_turn else 'k' in castling_rights  # Kingside castling
+	tensor[:, :, 8] = 'Q' in castling_rights if is_white_turn else 'q' in castling_rights  # Queenside castling
+	tensor[:, :, 7 + opponent_offset] = 'k' in castling_rights if is_white_turn else 'K' in castling_rights  # Opponent kingside
+	tensor[:, :, 8 + opponent_offset] = 'q' in castling_rights if is_white_turn else 'Q' in castling_rights  # Opponent queenside
 
 	# Encode en passant target square (Channel 14)
 	if en_passant != "-":
 		ep_square = chess.SQUARE_NAMES.index(en_passant)
 		row, col = divmod(ep_square, 8)
-		tensor[row, col, 16] = 1  # Mark en passant square
+		tensor[row, col, -1] = 1  # Mark en passant square
 
 	if not is_white_turn:
-		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks
+		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks)
 
 	return tensor
 
 def tensor_to_fen(tensor, is_white_turn=True):
 	"""
-	Reconstructs a FEN string from a (8,8,17) tensor.
+	Reconstructs a FEN string from a (8,8,19) tensor.
+	
 	Args:
-		tensor (np.ndarray): (8, 8, 17) tensor representation of the board.
+		tensor (np.ndarray): (8, 8, 19) tensor representation of the board.
 		is_white_turn (bool): Whether the current player to move is White.
 
 	Returns:
@@ -84,11 +88,11 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	"""
 	# Reverse rotation if it's black's turn (since it was rotated in `fast_fen_to_example`)
 	if not is_white_turn:
-		tensor = np.rot90(tensor, k=2, axes=(0, 1))  
+		tensor = np.flip(tensor, axis=0)  # Flip back the ranks
 
 	# Define piece mapping (reverse of `fast_fen_to_example`)
-	piece_map = {0: "P", 1: "N", 2: "B", 3: "R", 4: "Q", 5: "K"}
-	opponent_offset = 8
+	piece_map = {0: "P", 1: "N", 2: "B", 3: "B", 4: "R", 5: "Q", 6: "K"}
+	opponent_offset = 9  # Opponent pieces start at index 9
 
 	# Convert tensor to FEN board representation
 	fen_rows = []
@@ -96,39 +100,58 @@ def tensor_to_fen(tensor, is_white_turn=True):
 		fen_row = ""
 		empty_count = 0
 		for col in range(8):
-			# Check which piece is present
 			piece_found = False
-			for i in range(6):  # Check player's pieces
+
+			# Check player's pieces
+			for i in range(7):  
 				if tensor[row, col, i] == 1:
 					if empty_count > 0:
 						fen_row += str(empty_count)  # Add accumulated empty squares
 						empty_count = 0
-					fen_row += piece_map[i] if is_white_turn else piece_map[i].lower()
+
+					# Correctly reconstruct bishops as LSB or DSB
+					if i == 2 or i == 3:  # Bishops
+						bishop_char = "B"
+					else:
+						bishop_char = piece_map[i]
+
+					fen_row += bishop_char if is_white_turn else bishop_char.lower()
 					piece_found = True
 					break
-			for i in range(8, 14):  # Check opponent's pieces
+
+			# Check opponent's pieces
+			for i in range(9, 16):  
 				if tensor[row, col, i] == 1:
 					if empty_count > 0:
 						fen_row += str(empty_count)
 						empty_count = 0
-					fen_row += piece_map[i - opponent_offset].lower() if is_white_turn else piece_map[i - opponent_offset]
+
+					# Correctly reconstruct bishops as LSB or DSB
+					if i - opponent_offset == 2 or i - opponent_offset == 3:  # Bishops
+						bishop_char = "B"
+					else:
+						bishop_char = piece_map[i - opponent_offset]
+
+					fen_row += bishop_char.lower() if is_white_turn else bishop_char
 					piece_found = True
 					break
+
 			if not piece_found:
 				empty_count += 1
+
 		if empty_count > 0:
 			fen_row += str(empty_count)  # Append last empty squares count
 		fen_rows.append(fen_row)
 
-	# Castling rights
+	# Castling rights reconstruction
 	castling = ""
-	if tensor[0, :, 6].any():  # White kingside
+	if tensor[:, :, 7].any():  # White kingside
 		castling += "K"
-	if tensor[0, :, 7].any():  # White queenside
+	if tensor[:, :, 8].any():  # White queenside
 		castling += "Q"
-	if tensor[0, :, 14].any():  # Black kingside
+	if tensor[:, :, 17].any():  # Black kingside
 		castling += "k"
-	if tensor[0, :, 15].any():  # Black queenside
+	if tensor[:, :, 18].any():  # Black queenside
 		castling += "q"
 	castling = castling if castling else "-"
 
@@ -136,7 +159,7 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	ep_square = "-"
 	for row in range(8):
 		for col in range(8):
-			if tensor[row, col, 16] == 1:
+			if tensor[row, col, -1] == 1:  # Channel 18 stores en passant
 				ep_square = chess.square_name((7 - row) * 8 + col)  # Adjust for black-to-move rotation
 
 	# Construct final FEN string
@@ -177,7 +200,7 @@ def draw_chessboard(ax):
 
 	# Rank labels (1-8)
 	for i in range(8):
-		ax.text(-0.5, 7.5 - i, str(i + 1), ha="center", va="center", fontsize=10, fontweight="bold")
+		ax.text(-0.5, 7.5 - i, str(8 - i), ha="center", va="center", fontsize=10, fontweight="bold")
 
 	ax.set_xticks([])
 	ax.set_yticks([])

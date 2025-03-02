@@ -85,10 +85,11 @@ if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64)
 
+	os.makedirs("models", exist_ok=True)
+	model.summary()
 	model.fit(dataset, epochs=100, steps_per_epoch=1000)
 
 	# Save model
-	os.makedirs("models", exist_ok=True)
 	model.save("models/eda_model.keras")
 
 	# Iterate over 1000 samples and generate heatmaps
