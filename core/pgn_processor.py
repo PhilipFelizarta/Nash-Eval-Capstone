@@ -82,6 +82,19 @@ def pgn_zst_to_json(zst_file, output_folder, max_games=1000):
 		with dctx.stream_reader(compressed) as reader:
 			process_pgn_stream(reader, output_folder, max_games)
 
+def compress_pgn(input_pgn_path, output_zst_path, compression_level=22):
+	with open(input_pgn_path, 'rb') as f_in:
+		data = f_in.read()
+
+	compressor = zstd.ZstdCompressor(level=compression_level)
+	compressed_data = compressor.compress(data)
+
+	with open(output_zst_path, 'wb') as f_out:
+		f_out.write(compressed_data)
+
+
 if __name__ == "__main__":
-	target_date = "2013-01"
-	pgn_zst_to_json(f"data/lichess_db_standard_rated_{target_date}.pgn.zst", f"fen_data/{target_date}/", max_games=int(1e8))
+	#target_date = "2013-01"
+	#pgn_zst_to_json(f"data/lichess_db_standard_rated_{target_date}.pgn.zst", f"fen_data/{target_date}/", max_games=int(1e8))
+
+	compress_pgn("data/LumbrasGigaBase 2024.pgn", "data/LumbrasGigaBase 2024.pgn.zst")

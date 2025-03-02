@@ -64,8 +64,8 @@ def plot_heatmap(model, sample_input, true_class, pred_label, path="example_map.
 	plt.title(f"Label: {true_class} -- Pred:{pred_label}")
 	
 	# Save & Show
-	os.makedirs("figures", exist_ok=True)
-	plt.savefig(f"figures/{path}", dpi=300, bbox_inches="tight")
+	os.makedirs(os.path.dirname(path), exist_ok=True)
+	plt.savefig(path, dpi=300, bbox_inches="tight")
 	plt.close()
 
 if __name__ == "__main__":
@@ -83,24 +83,28 @@ if __name__ == "__main__":
 	)
 
 	zst_file = "data/lichess_db_standard_rated_2025-02.pgn.zst"
-	dataset = chess_database.get_tf_dataset(zst_file, batch_size=4)
+	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64)
 
-	model.fit(dataset, epochs=1, steps_per_epoch=1000)
+	model.fit(dataset, epochs=100, steps_per_epoch=1000)
 
 	# Save model
 	os.makedirs("models", exist_ok=True)
 	model.save("models/eda_model.keras")
 
-	# Get a sample from dataset
-	sample_batch = next(iter(dataset.take(1)))  # Take one batch
-	sample_input, sample_label = sample_batch
+	# Iterate over 1000 samples and generate heatmaps
+	for i, sample_batch in enumerate(dataset.take(100)):  
+		sample_input, sample_label = sample_batch
 
-	sample_input = sample_input.numpy()[0]  # Extract first example
-	true_class = int(sample_label.numpy()[0])  # Extract true class
+		# Convert tensor to NumPy array
+		sample_input = sample_input.numpy()[0]  # Extract first example
+		true_class = int(sample_label.numpy()[0])  # Extract true class
 
-	# Make prediction
-	pred_probs = model.predict(sample_input[np.newaxis, ...])  # Add batch dim
-	pred_label = np.argmax(pred_probs)  # Get the highest probability class
+		# Make prediction
+		pred_probs = model.predict(sample_input[np.newaxis, ...])  # Add batch dim
+		pred_label = np.argmax(pred_probs)  # Get the highest probability class
 
-	# Generate and plot heatmap
-	plot_heatmap(model, sample_input, true_class, pred_label, path="example.png")
+		# Generate and plot heatmap, save as example_{index}.png
+		plot_heatmap(model, sample_input, true_class, pred_label, path=f"figures/eda/heatmaps/example_{i}.png")
+
+		if (i + 1) % 100 == 0:
+			print(f"Generated {i + 1} heatmaps...")

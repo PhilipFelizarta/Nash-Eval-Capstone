@@ -3,5 +3,5 @@ env/
 data/
 fen_data/
 *.log
-
+models/
 *__pycache__
