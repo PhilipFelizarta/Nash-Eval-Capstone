@@ -82,7 +82,7 @@ if __name__ == "__main__":
 		metrics=['accuracy']
 	)
 
-	zst_file = "data/lichess_db_standard_rated_2025-02.pgn.zst"
+	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64)
 
 	model.fit(dataset, epochs=100, steps_per_epoch=1000)
