@@ -8,7 +8,7 @@ if __name__ == "__main__":
 		keras.layers.Conv2D(64, (3,3), activation='relu'),
 		keras.layers.Flatten(),
 		keras.layers.Dense(128, activation='relu'),
-		keras.layers.Dense(3, activation='softmax')  # 3 categories: {0: Draw, 1: White Wins, 2: Black Wins}
+		keras.layers.Dense(3, activation='softmax')  # 3 categories: {1: Player Move Wins, 1: Draw, 2: Opponent Wins}
 	])
 
 	model.compile(
@@ -18,6 +18,6 @@ if __name__ == "__main__":
 	)
 
 	zst_file = "data/lichess_db_standard_rated_2025-02.pgn.zst"
-	dataset = chess_database.get_tf_dataset(zst_file, batch_size=4096)
+	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64)
 
 	model.fit(dataset, epochs=10, steps_per_epoch=1000)
