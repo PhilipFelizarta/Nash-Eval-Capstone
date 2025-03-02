@@ -36,6 +36,9 @@ def process_pgn_stream(file_obj, output_folder, max_games):
 		node = game
 		game_result = extract_game_result(game.headers)
 
+		if game_result == 2: # Invalid game
+			continue
+
 		game_data = []  # Store positions for this game
 
 		while node.variations:
@@ -50,11 +53,9 @@ def process_pgn_stream(file_obj, output_folder, max_games):
 			relative_modifier = -1 if turn else 1
 			# Save position details
 			example = {
-				"move_number": move_number,
 				"fen": fen,
 				"move": move_uci,
 				"game_result": game_result,
-				"turn": board.turn,
 				"label_sparse": int((game_result * relative_modifier) + 1) # Normalize between 0 and 2 for sparse crossentropy
 			}
 			game_data.append(example)
@@ -81,5 +82,6 @@ def pgn_zst_to_json(zst_file, output_folder, max_games=1000):
 		with dctx.stream_reader(compressed) as reader:
 			process_pgn_stream(reader, output_folder, max_games)
 
-# Example usage:
-pgn_zst_to_json("data/lichess_db_standard_rated_2013-01.pgn.zst", "fen_data/", max_games=1)
+if __name__ == "__main__":
+	target_date = "2013-01"
+	pgn_zst_to_json(f"data/lichess_db_standard_rated_{target_date}.pgn.zst", f"fen_data/{target_date}/", max_games=int(1e8))

@@ -1,5 +1,8 @@
 import numpy as np
 import chess
+import os
+import json
+import time
 
 def fast_fen_to_example(fen):
 	"""
@@ -63,13 +66,52 @@ def fast_fen_to_example(fen):
 
 	return tensor
 
-# Example usage
+def game_to_batch(game_json):
+	"""
+	Converts a list of game move data into (input tensor, label) pairs for training.
+
+	Args:
+		game_json (list): List of move dictionaries from a game.
+
+	Returns:
+		list: List of (tensor, label) tuples for training.
+	"""
+	examples = []
+	labels = []
+
+	for move_data in game_json:
+		fen = move_data["fen"]
+		label = move_data["label_sparse"]  # Sparse categorical cross-entropy label
+
+		# Convert FEN to tensor
+		tensor = fast_fen_to_example(fen)
+
+		# Store the (tensor, label) pair
+		examples.append(tensor)
+		labels.append(label)
+
+	return examples, labels
+
+def benchmark_game_to_batch(json_path):
+	"""
+	Measures the execution time of game_to_batch() function.
+	"""
+	if not os.path.exists(json_path):
+		print(f"Error: File {json_path} not found.")
+		return
+
+	with open(json_path, "r", encoding="utf-8") as f:
+		game_data = json.load(f)
+
+	start_time = time.perf_counter()  
+	dataset = game_to_batch(game_data)  
+	end_time = time.perf_counter()  
+
+	elapsed_time = end_time - start_time
+	print(f"\nProcessing time: {elapsed_time:.6f} seconds")
+	print(f"Total moves processed: {len(dataset[0])}")
+	print(f"Example tensor shape: {dataset[0][0].shape}")
+
 if __name__ == "__main__":
-	example_fen = "r1bqkb1r/p1pp1ppn/1pn1p3/R7/4P1Qp/3N4/PPPP1PPP/2B1KBNR w Kkq - 0 1"
-	tensor = fast_fen_to_example(example_fen)
-	print("Tensor shape:", tensor.shape)  # Should print (8, 8, 16)
-	
-	# Print each channel separately for full representation
-	for i in range(tensor.shape[2]):
-		print(f"\nChannel {i}:")
-		print(tensor[:, :, i])
+	json_path = "fen_data/game_0.json"
+	benchmark_game_to_batch(json_path)
