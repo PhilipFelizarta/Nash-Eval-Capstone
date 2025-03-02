@@ -3,6 +3,8 @@ import chess
 import os
 import json
 import time
+import zstandard as zstd
+
 
 def fast_fen_to_example(fen):
 	"""
