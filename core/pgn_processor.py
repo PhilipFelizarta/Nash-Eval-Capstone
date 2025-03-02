@@ -45,12 +45,17 @@ def process_pgn_stream(file_obj, output_folder, max_games):
 			# Extract metadata
 			fen = board.fen()
 			move_uci = move.uci()
+
+			turn = board.turn
+			relative_modifier = -1 if turn else 1
 			# Save position details
 			example = {
 				"move_number": move_number,
 				"fen": fen,
 				"move": move_uci,
-				"game_result": game_result
+				"game_result": game_result,
+				"turn": board.turn,
+				"label_sparse": int((game_result * relative_modifier) + 1) # Normalize between 0 and 2 for sparse crossentropy
 			}
 			game_data.append(example)
 
