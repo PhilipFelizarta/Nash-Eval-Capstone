@@ -1,0 +1,1 @@
+# Create an environment that converts pgns to chess states for a neural network.
