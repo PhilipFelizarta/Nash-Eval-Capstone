@@ -18,7 +18,7 @@ def fast_fen_to_example(fen):
 		- Next 6 channels: Opponent's pieces
 		- Channels 15 & 16: Opponent's kingside & queenside castling rights
 		- Channel 17 encodes a bit for the en passant square
-		- Rotates 180 deg when Black to move.
+		- Board flips when black to move to maintain hero/villian representation.
 
 	Args:
 		fen (str): Chess position in FEN notation.
@@ -68,7 +68,7 @@ def fast_fen_to_example(fen):
 		tensor[row, col, 16] = 1  # Mark en passant square
 
 	if not is_white_turn:
-		tensor = np.rot90(tensor, k=2, axes=(0, 1))  # Rotates all (8,8) slices
+		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks
 
 	return tensor
 
