@@ -61,8 +61,10 @@ def plot_piece_density_by_type(zst_file, sample_size=1000):
 		chess_env.draw_chessboard(ax)
 		im = ax.imshow(avg_hero[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
 		ax.set_title(PIECE_NAMES[i])
-		fig.colorbar(im, ax=ax)
-	plt.show()
+		fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+	
+	plt.savefig("figures/standard_eda/hero_piece_distribution.png", dpi=300, bbox_inches="tight")
+	plt.close()
 
 	# Plot Villain Piece Density by Type
 	fig, axes = plt.subplots(2, 3, figsize=(15, 10))
@@ -71,8 +73,9 @@ def plot_piece_density_by_type(zst_file, sample_size=1000):
 		chess_env.draw_chessboard(ax)
 		im = ax.imshow(avg_villain[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
 		ax.set_title(PIECE_NAMES[i])
-		fig.colorbar(im, ax=ax)
-	plt.show()
+		fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+	plt.savefig("figures/standard_eda/villain_piece_distribution.png", dpi=300, bbox_inches="tight")
+	plt.close()
 
 if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"

@@ -56,7 +56,7 @@ def plot_heatmap(model, sample_input, true_class, pred_label, path="example_map.
 
 	# Overlay Heatmap
 	heatmap_img = ax.imshow(
-		heatmap, cmap='jet', alpha=0.6, extent=[0, 8, 0, 8]
+		heatmap, cmap='PuBuGn', alpha=0.9, extent=[0, 8, 0, 8]
 	)
 
 	# Add Colorbar

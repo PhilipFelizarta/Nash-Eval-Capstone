@@ -170,6 +170,15 @@ def draw_chessboard(ax):
 		ax.plot([i, i], [0, 8], color='black', linewidth=1)
 		ax.plot([0, 8], [i, i], color='black', linewidth=1)
 
+	# File labels (a-h)
+	file_labels = "abcdefgh"
+	for i in range(8):
+		ax.text(i + 0.5, -0.5, file_labels[i], ha="center", va="center", fontsize=10, fontweight="bold")
+
+	# Rank labels (1-8)
+	for i in range(8):
+		ax.text(-0.5, 7.5 - i, str(i + 1), ha="center", va="center", fontsize=10, fontweight="bold")
+
 	ax.set_xticks([])
 	ax.set_yticks([])
 
