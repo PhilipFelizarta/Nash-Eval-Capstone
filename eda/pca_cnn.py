@@ -11,7 +11,7 @@ import core.chess_database as chess_database  # Ensure this module is available
 
 if __name__ == "__main__":
 	# Load trained CNN model
-	model = tf.keras.models.load_model("models/eda_model.h5")
+	model = tf.keras.models.load_model("models/eda_model_epoch_004.h5")
 	
 	print("---EDA Model---")
 	model.summary()
