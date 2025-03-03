@@ -4,7 +4,6 @@ import zstandard as zstd
 import io
 import tensorflow as tf
 import core.chess_environment as chess_env
-import copy
 
 GAMMA = 0.99 # Discount factor for importance sampling.
 
@@ -84,7 +83,7 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 	Returns a TensorFlow Dataset streaming from a multi-threaded PGN generator.
 	"""
 	output_signature = (
-		tf.TensorSpec(shape=(None, 8, 8, 17), dtype=tf.float32),  # Input tensor batch
+		tf.TensorSpec(shape=(None, 8, 8, 19), dtype=tf.float32),  # Input tensor batch
 		tf.TensorSpec(shape=(None,), dtype=tf.int32),  # Sparse categorical labels
 		tf.TensorSpec(shape=(None,), dtype=tf.float32)  # Importance weights
 	)

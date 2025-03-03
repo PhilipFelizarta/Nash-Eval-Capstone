@@ -16,7 +16,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy the entire project into the container
 COPY core/chess_database.py core/chess_database.py
 COPY core/chess_environment.py core/chess_environment.py
-COPY pretraining/pretrain_script.py script.py
+COPY core/model_framework.py core/model_framework.py
+COPY pretraining/model_eda.py script.py
 
 # Set environment variables for TensorFlow GPU
 ENV NVIDIA_VISIBLE_DEVICES all

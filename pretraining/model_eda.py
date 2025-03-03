@@ -10,13 +10,14 @@ import chess
 
 import core.chess_database as chess_database
 import core.chess_environment as chess_env
+import core.model_framework as model_framework
 
 def generate_heatmap(model, img, class_idx):
 	"""
 	Generates a heatmap using GAP weights for interpretability.
 	"""
 	# Extract the output of the last convolutional layer
-	last_conv_layer = model.layers[-2]  # GAP is directly after this layer
+	last_conv_layer = model.layers[-3]  # GAP is directly after this layer
 	last_conv_model = Model(model.input, last_conv_layer.input)
 	
 	# Compute feature maps from last conv layer
@@ -30,9 +31,6 @@ def generate_heatmap(model, img, class_idx):
 	# Compute the weighted sum of feature maps
 	heat_map = np.dot(last_conv_output, final_dense_weights_for_class)
 
-	# Normalize heatmap
-	heat_map = np.maximum(heat_map, 0)  # ReLU (remove negatives)
-	heat_map /= np.max(heat_map)  # Normalize to [0,1]
 
 	return heat_map
 
@@ -56,7 +54,7 @@ def plot_heatmap(model, sample_input, true_class, pred_label, path="example_map.
 
 	# Overlay Heatmap
 	heatmap_img = ax.imshow(
-		heatmap, cmap='PuBuGn', alpha=0.9, extent=[0, 8, 0, 8]
+		heatmap, cmap='Reds', alpha=0.9, extent=[0, 8, 0, 8]
 	)
 
 	# Add Colorbar
@@ -69,32 +67,48 @@ def plot_heatmap(model, sample_input, true_class, pred_label, path="example_map.
 	plt.close()
 
 if __name__ == "__main__":
-	model = keras.Sequential([
-		keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', input_shape=(8, 8, 17)),
-		keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-		keras.layers.GlobalAveragePooling2D(),  # Directly after conv layers
-		keras.layers.Dense(3, activation='softmax')  # Final classification layer
-	])
+	model = model_framework.exploratory_model()
 
-	model.compile(
-		optimizer=keras.optimizers.Adam(),
-		loss=keras.losses.SparseCategoricalCrossentropy(),
-		metrics=['accuracy']
-	)
-
-	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
-	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64)
+	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
+	dataset = chess_database.get_tf_dataset(zst_file, batch_size=128) #.shuffle(10000)
 
 	os.makedirs("models", exist_ok=True)
+	os.makedirs("figures", exist_ok=True)  # Ensure figures directory exists
+
 	model.summary()
-	model.fit(dataset, epochs=100, steps_per_epoch=1000)
+
+	# Train model and capture history
+	history = model.fit(dataset, epochs=100, steps_per_epoch=1000)
 
 	# Save model
-	model.save("models/eda_model.keras")
+	model.save("models/eda_model.h5")
+
+	# Extract loss and accuracy from history
+	loss = history.history['loss']
+	accuracy = history.history['accuracy']
+	epochs = np.arange(1, len(loss) + 1)
+
+	# Plot training loss and accuracy
+	plt.figure(figsize=(10, 6))
+	plt.plot(epochs, loss, label="Loss", color='red', marker='o')
+	plt.plot(epochs, accuracy, label="Accuracy", color='blue', marker='s')
+
+	plt.xlabel("Epochs")
+	plt.ylabel("Metric Value")
+	plt.title("Training Loss & Accuracy Over Epochs")
+	plt.legend()
+	plt.grid(True)
+
+	# Save the training history plot
+	training_plot_path = "figures/eda_model_training.png"
+	plt.savefig(training_plot_path, dpi=300, bbox_inches="tight")
+	plt.close()
+
+	print(f"✅ Training history saved to {training_plot_path}")
 
 	# Iterate over 1000 samples and generate heatmaps
 	for i, sample_batch in enumerate(dataset.take(100)):  
-		sample_input, sample_label = sample_batch
+		sample_input, sample_label, _ = sample_batch
 
 		# Convert tensor to NumPy array
 		sample_input = sample_input.numpy()[0]  # Extract first example
