@@ -50,7 +50,10 @@ def fast_fen_to_example(fen):
 				piece_index = piece_map.get(char.upper(), None)
 				if piece_index is not None:
 					if char.upper() == "B":
-						piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
+						if is_white_turn:
+							piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
+						else:
+							piece_index = 3 if (row_idx + col_idx) % 2 == 0 else 2  # We need this since we do a horizontal flip
 			
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player

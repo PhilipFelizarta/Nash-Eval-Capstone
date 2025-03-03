@@ -7,6 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras import Model
 import chess
+import imageio.v2 as imageio
+from PIL import Image
 
 import core.chess_database as chess_database
 import core.chess_environment as chess_env
@@ -83,14 +85,12 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 	"""Plots hero and villain piece densities for different game outcomes, adjusted by importance sampling."""
 	gen = chess_database.pgn_zst_generator(zst_file, batch_size=32)
 
-	# Storage for piece densities by game outcome
 	piece_densities = {
 		0: {"hero": np.zeros((8, 8, 7)), "villain": np.zeros((8, 8, 7)), "weight_sum": 0, "count_samples": 0},
 		1: {"hero": np.zeros((8, 8, 7)), "villain": np.zeros((8, 8, 7)), "weight_sum": 0, "count_samples": 0},
 		2: {"hero": np.zeros((8, 8, 7)), "villain": np.zeros((8, 8, 7)), "weight_sum": 0, "count_samples": 0},
 	}
 
-	# Collect data
 	count = 0
 	for game_data, labels, importance in gen:
 		for i in range(len(labels)):
@@ -98,17 +98,15 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 			if label in piece_densities:
 				weight = importance[i]
 
-				piece_densities[label]["hero"] += weight * game_data[i, :, :, :7]  # Hero pieces with LSB/DSB
-				piece_densities[label]["villain"] += weight * game_data[i, :, :, 9:16]  # Villain pieces
+				piece_densities[label]["hero"] += weight * game_data[i, :, :, :7]
+				piece_densities[label]["villain"] += weight * game_data[i, :, :, 9:16]
 				piece_densities[label]["weight_sum"] += weight
-				piece_densities[label]["count_samples"] += 1  # Direct count of samples
+				piece_densities[label]["count_samples"] += 1  
 				
 				count += 1
 		
 		if count >= sample_size:
 			break
-
-	PIECE_NAMES = ["Pawn", "Knight", "LSB", "DSB", "Rook", "Queen", "King"]
 
 	for result_label, result_name in RESULT_CATEGORIES.items():
 		total_weight = piece_densities[result_label]["weight_sum"]
@@ -122,33 +120,39 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 		avg_villain = piece_densities[result_label]["villain"] / total_weight
 
 		# Plot Hero Piece Density
-		fig, axes = plt.subplots(2, 4, figsize=(20, 12))
+		fig, axes = plt.subplots(3, 3, figsize=(16, 12))
 		fig.suptitle(f"Hero Piece Density ({result_name})\nTotal Weight: {total_weight:.2f} | Samples: {num_samples}", fontsize=16)
-		plt.subplots_adjust(hspace=-0.3, wspace=0.3)
+		plt.subplots_adjust(hspace=0.2, wspace=0.3)
 
-		for i, ax in enumerate(axes.flat[:7]):
-			chess_env.draw_chessboard(ax)
-			im = ax.imshow(avg_hero[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
-			ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
-			fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+		for i, ax in enumerate(axes.flat):
+			if i < 7:
+				chess_env.draw_chessboard(ax)
+				im = ax.imshow(avg_hero[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
+				ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
+				fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+			else:
+				ax.axis("off")
 
 		plt.savefig(f"figures/standard_eda/hero_piece_distribution_{result_label}.png", dpi=300, bbox_inches="tight")
 		plt.close()
 
 		# Plot Villain Piece Density
-		fig, axes = plt.subplots(2, 4, figsize=(20, 12))
+		fig, axes = plt.subplots(3, 3, figsize=(16, 12))
 		fig.suptitle(f"Villain Piece Density ({result_name})\nTotal Weight: {total_weight:.2f} | Samples: {num_samples}", fontsize=16)
-		plt.subplots_adjust(hspace=-0.3, wspace=0.3)
+		plt.subplots_adjust(hspace=0.2, wspace=0.3)
 
-		for i, ax in enumerate(axes.flat[:7]):
-			chess_env.draw_chessboard(ax)
-			im = ax.imshow(avg_villain[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
-			ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
-			fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+		for i, ax in enumerate(axes.flat):
+			if i < 7:
+				chess_env.draw_chessboard(ax)
+				im = ax.imshow(avg_villain[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
+				ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
+				fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+			else:
+				ax.axis("off")
 
 		plt.savefig(f"figures/standard_eda/villain_piece_distribution_{result_label}.png", dpi=300, bbox_inches="tight")
 		plt.close()
 
 if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
-	plot_piece_density_by_label(zst_file, sample_size=1000)
+	plot_piece_density_by_label(zst_file, sample_size=100000)

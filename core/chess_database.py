@@ -4,6 +4,7 @@ import zstandard as zstd
 import io
 import tensorflow as tf
 import core.chess_environment as chess_env
+import copy
 
 GAMMA = 0.99 # Discount factor for importance sampling.
 
@@ -44,17 +45,11 @@ def pgn_zst_generator(zst_file, batch_size=32):
 					continue  
 
 				# Compute total number of plies in the game
-				ply_count = 0
-				temp_node = game
-				while temp_node.variations:
-					temp_node = temp_node.variation(0)
-					ply_count += 1
-
+				ply_count = sum(1 for _ in game.mainline_moves())  # Efficient ply counter
 				current_ply = 0
 
-				while node.variations:
-					next_node = node.variation(0)
-					move = next_node.move
+				# Iterate through only mainline moves
+				for move in game.mainline_moves():
 					fen = board.fen()
 					turn = board.turn
 					relative_modifier = -1 if turn else 1
@@ -72,7 +67,6 @@ def pgn_zst_generator(zst_file, batch_size=32):
 
 					# Move forward
 					board.push(move)
-					node = next_node
 					current_ply += 1
 
 					# Yield batch when ready
