@@ -127,7 +127,7 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 		for i, ax in enumerate(axes.flat):
 			if i < 7:
 				chess_env.draw_chessboard(ax)
-				im = ax.imshow(avg_hero[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
+				im = ax.imshow(avg_hero[:, :, i], cmap="Reds", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
 				ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
 				fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 			else:
@@ -144,7 +144,7 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 		for i, ax in enumerate(axes.flat):
 			if i < 7:
 				chess_env.draw_chessboard(ax)
-				im = ax.imshow(avg_villain[:, :, i], cmap="PuBuGn", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
+				im = ax.imshow(avg_villain[:, :, i], cmap="Reds", interpolation="nearest", alpha=0.9, extent=[0, 8, 0, 8])
 				ax.set_title(f"{PIECE_NAMES[i]}", fontsize=14)
 				fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 			else:

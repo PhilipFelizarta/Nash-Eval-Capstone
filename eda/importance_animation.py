@@ -71,7 +71,7 @@ def plot_piece_density_by_importance(zst_file, sample_size=50000, num_frames=20)
 def save_animation(hero_frames, villain_frames, importance_thresholds):
 	"""Saves animations for each piece's density evolution."""
 	os.makedirs("figures/animations", exist_ok=True)
-	cmap = "magma"  # Updated colormap for better contrast
+	cmap = "Reds"  # Updated colormap for better contrast
 
 	for piece in range(7):
 		hero_images = []
@@ -115,4 +115,4 @@ def save_animation(hero_frames, villain_frames, importance_thresholds):
 
 if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
-	plot_piece_density_by_importance(zst_file, sample_size=50000, num_frames=20)
+	plot_piece_density_by_importance(zst_file, sample_size=int(1e5), num_frames=20)

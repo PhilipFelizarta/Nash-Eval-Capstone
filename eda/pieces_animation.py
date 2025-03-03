@@ -64,7 +64,7 @@ def plot_piece_density_by_piece_count(zst_file, sample_size=50000):
 def save_animation_pieces(hero_frames, villain_frames, piece_counts):
 	"""Saves animations for each piece's density evolution."""
 	os.makedirs("figures/animations/", exist_ok=True)
-	cmap = "magma"
+	cmap = "Reds"
 
 	for piece in range(7):
 		hero_images = []
@@ -108,4 +108,4 @@ def save_animation_pieces(hero_frames, villain_frames, piece_counts):
 
 if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
-	plot_piece_density_by_piece_count(zst_file, sample_size=50000)
+	plot_piece_density_by_piece_count(zst_file, sample_size=int(1e5))
