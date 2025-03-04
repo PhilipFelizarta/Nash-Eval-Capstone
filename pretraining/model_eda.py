@@ -29,7 +29,7 @@ if __name__ == "__main__":
 	plot_callback = model_framework.TrainingPlotCallback(save_interval=1, plot_path="figures/training/eda_model_training.png")
 
 	# Train model and capture history
-	history = model.fit(dataset, epochs=25, steps_per_epoch=1000, callbacks=[checkpoint_callback, csv_logger, plot_callback])
+	history = model.fit(dataset, epochs=50, steps_per_epoch=100000, callbacks=[checkpoint_callback, csv_logger, plot_callback])
 
 	# Save model
 	model.save("models/eda_model.h5")
