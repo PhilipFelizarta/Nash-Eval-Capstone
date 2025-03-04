@@ -37,7 +37,7 @@ def fast_fen_to_example(fen):
 	board_part, turn, castling_rights, en_passant = parts[0], parts[1], parts[2], parts[3]
 
 	# Identify whose turn it is
-	is_white_turn = turn == 'w'
+	is_white_turn = (turn == 'w')
 
 	# Parse board
 	rows = board_part.split("/")
@@ -210,10 +210,18 @@ def draw_chessboard(ax):
 
 def draw_pieces(ax, board):
 	"""Overlays Unicode chess pieces on the board with proper contrast."""
+	is_black_to_move = board.turn == chess.BLACK  # Detect turn
+
 	for square in chess.SQUARES:
 		piece = board.piece_at(square)
 		if piece:
-			col, row = chess.square_file(square), 7 - chess.square_rank(square)
+			col, row = chess.square_file(square), chess.square_rank(square)
+
+			# **Flip the board if Black is to move**
+			if is_black_to_move:
+				row = 7 - row
+				col = 7 - col  # Also flip the file
+
 			piece_symbol = UNICODE_PIECES[piece.symbol()]
 
 			# Determine if square is light or dark
@@ -221,8 +229,8 @@ def draw_pieces(ax, board):
 			is_white_piece = piece.color == chess.WHITE
 
 			# Set text color and outline
-			text_color = 'black' if is_white_piece else 'white'
-			outline_color = 'white' if is_white_piece else 'black'  # White outline for black pieces, black for white
+			text_color = 'white' if is_white_piece else 'black'
+			outline_color = 'black' if is_white_piece else 'white'  # White outline for black pieces, black for white
 
 			# Apply stroke effect for visibility
 			path_effects_style = [
