@@ -84,14 +84,29 @@ def generate_pseudo_legal_moves(tensor, piece_positions):
 		""" Update multiple move positions at once using NumPy indexing. """
 		if not positions:
 			return
-		indices = np.array([r * 8 + c for r, c in positions])
+
+		indices = np.array([r * 8 + c for r, c in positions if (0 <= r < 8 and 0 <= c < 8)])
 		valid_indices = indices[indices < 64]  # Ensure indices stay within bounds
 
-		moves = np.array([move_table[idx] for idx in valid_indices if idx in move_table])
-		if moves.size > 0:
-			moves = np.concatenate(moves, axis=0)  # Flatten list of lists
-			valid_moves = moves[(moves[:, 0] >= 0) & (moves[:, 0] < 8) & (moves[:, 1] >= 0) & (moves[:, 1] < 8)]
+		all_moves = []
+		for idx in valid_indices:
+			if idx in move_table:
+				for move_list in move_table[idx]:  # Handle nested lists properly
+					all_moves.extend(move_list)  # Flatten
+
+		if not all_moves:
+			return
+
+		# Ensure `moves` is a 2D array, even if it contains only one move
+		moves = np.array(all_moves, dtype=np.int32)
+		if moves.ndim == 1:  # If `moves` is a 1D array, reshape it to (N, 2)
+			moves = moves.reshape(-1, 2)
+
+		valid_moves = moves[(moves[:, 0] >= 0) & (moves[:, 0] < 8) & (moves[:, 1] >= 0) & (moves[:, 1] < 8)]
+
+		if valid_moves.size > 0:
 			tensor[valid_moves[:, 0], valid_moves[:, 1], plane] = 1
+
 
 	# Process Knights
 	batch_update(tensor, piece_positions.get("N_white", []), KNIGHT_MOVES, move_channels["N"][0])

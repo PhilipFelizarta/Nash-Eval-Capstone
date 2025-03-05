@@ -62,13 +62,20 @@ def fast_fen_to_example(fen):
 				piece_index = piece_map.get(char.upper(), None)
 				if piece_index is not None:
 					if char.upper() == "B":
-						if is_white_turn:
+						square_sum_cond = (row_idx + col_idx) % 2 == 0
 
-							piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
-							char = "B" if (row_idx + col_idx) % 2 == 0 else "D"
+						if is_white_turn:
+							piece_index = 2 if square_sum_cond else 3  # LSB (2) or DSB (3)
+							if char.isupper():
+								char = "B" if square_sum_cond else "D"
+							else:
+								char = "b" if square_sum_cond else "d"
 						else:
-							piece_index = 3 if (row_idx + col_idx) % 2 == 0 else 2  # We need this since we do a horizontal flip
-							char = "D" if (row_idx + col_idx) % 2 == 0 else "B"
+							piece_index = 3 if square_sum_cond else 2  # We need this since we do a horizontal flip
+							if char.isupper():
+								char = "D" if square_sum_cond else "B"
+							else:
+								char = "d" if square_sum_cond else "b"
 					
 					is_white_piece = char.isupper()
 			
@@ -89,10 +96,12 @@ def fast_fen_to_example(fen):
 	tensor[:, :, 7 + opponent_offset] = 'k' in castling_rights if is_white_turn else 'K' in castling_rights  # Opponent kingside
 	tensor[:, :, 8 + opponent_offset] = 'q' in castling_rights if is_white_turn else 'Q' in castling_rights  # Opponent queenside
 
-	# Encode en passant target square (Channel 14)
+	# Encode en passant target square (Channel 18)
+	row_names="87654321"
+	col_names="abcdefgh"
 	if en_passant != "-":
-		ep_square = chess.SQUARE_NAMES.index(en_passant)
-		row, col = divmod(ep_square, 8)
+		col = col_names.index(en_passant[0])
+		row = row_names.index(en_passant[1])
 		tensor[row, col, 18] = 1  # Mark en passant square
 
 	if not is_white_turn:
@@ -176,9 +185,9 @@ def tensor_to_fen(tensor, is_white_turn=True):
 		castling += "K"
 	if tensor[:, :, 8].any():  # White queenside
 		castling += "Q"
-	if tensor[:, :, 17].any():  # Black kingside
+	if tensor[:, :, 16].any():  # Black kingside
 		castling += "k"
-	if tensor[:, :, 18].any():  # Black queenside
+	if tensor[:, :, 17].any():  # Black queenside
 		castling += "q"
 	castling = castling if castling else "-"
 
@@ -186,7 +195,7 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	ep_square = "-"
 	for row in range(8):
 		for col in range(8):
-			if tensor[row, col, -1] == 1:  # Channel 18 stores en passant
+			if tensor[row, col, 18] == 1:  # Channel 19 stores en passant
 				ep_square = chess.square_name((7 - row) * 8 + col)  # Adjust for black-to-move rotation
 
 	# Construct final FEN string
