@@ -9,6 +9,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 from matplotlib.colors import ListedColormap
+import core.chess_precomputed as chess_precomputed
+
+
 
 def fast_fen_to_example(fen):
 	"""
@@ -20,13 +23,17 @@ def fast_fen_to_example(fen):
 		- Channel 19 encodes a bit for the en passant square
 		- Board flips when black to move to maintain hero/villian representation.
 
+	Extra encoding layers.
+		Channel 20-32 encodes peusdo-legal move maps for each piece type.
+
 	Args:
 		fen (str): Chess position in FEN notation.
 
 	Returns:
-		np.ndarray: (8, 8, 19) tensor representation of the board.
+		np.ndarray: (8, 8, 19) tensor representation of the board. ---> directly to fen
+		The next 14 channels encode the psuedo legal moves. 20 -> 33
 	"""
-	tensor = np.zeros((8, 8, 19), dtype=np.float32)
+	tensor = np.zeros((8, 8, 33), dtype=np.uint8)
 
 	# Define piece mappings (relative to current player)
 	piece_map = {"P": 0, "N": 1, "B": 2, "R": 4, "Q": 5, "K": 6}
@@ -38,6 +45,11 @@ def fast_fen_to_example(fen):
 
 	# Identify whose turn it is
 	is_white_turn = (turn == 'w')
+
+	piece_positions = {
+		"P_white": [], "N_white": [], "B_white": [], "D_white": [], "R_white": [], "Q_white": [], "K_white": [],
+		"P_black": [], "N_black": [], "B_black": [], "D_black": [], "R_black": [], "Q_black": [], "K_black": []
+	}
 
 	# Parse board
 	rows = board_part.split("/")
@@ -51,14 +63,24 @@ def fast_fen_to_example(fen):
 				if piece_index is not None:
 					if char.upper() == "B":
 						if is_white_turn:
+
 							piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
+							char = "B" if (row_idx + col_idx) % 2 == 0 else "D"
 						else:
 							piece_index = 3 if (row_idx + col_idx) % 2 == 0 else 2  # We need this since we do a horizontal flip
+							char = "D" if (row_idx + col_idx) % 2 == 0 else "B"
+					
+					is_white_piece = char.isupper()
 			
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player
 					else:
 						tensor[row_idx, col_idx, piece_index + opponent_offset] = 1  # Opponent
+					
+					# Store piece positions for move generation
+					piece_key = f"{char.upper()}_{'white' if is_white_piece else 'black'}"
+					piece_positions[piece_key].append((row_idx, col_idx))
+		
 				col_idx += 1
 
 	# Encode castling rights
@@ -71,10 +93,12 @@ def fast_fen_to_example(fen):
 	if en_passant != "-":
 		ep_square = chess.SQUARE_NAMES.index(en_passant)
 		row, col = divmod(ep_square, 8)
-		tensor[row, col, -1] = 1  # Mark en passant square
+		tensor[row, col, 18] = 1  # Mark en passant square
 
 	if not is_white_turn:
 		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks)
+	
+	tensor = chess_precomputed.generate_pseudo_legal_moves(tensor, piece_positions)
 
 	return tensor
 
