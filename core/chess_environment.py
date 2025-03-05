@@ -9,6 +9,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 from matplotlib.colors import ListedColormap
+import core.chess_precomputed as chess_precomputed
+
+
 
 def fast_fen_to_example(fen):
 	"""
@@ -20,13 +23,17 @@ def fast_fen_to_example(fen):
 		- Channel 19 encodes a bit for the en passant square
 		- Board flips when black to move to maintain hero/villian representation.
 
+	Extra encoding layers.
+		Channel 20-32 encodes peusdo-legal move maps for each piece type.
+
 	Args:
 		fen (str): Chess position in FEN notation.
 
 	Returns:
-		np.ndarray: (8, 8, 19) tensor representation of the board.
+		np.ndarray: (8, 8, 19) tensor representation of the board. ---> directly to fen
+		The next 14 channels encode the psuedo legal moves. 20 -> 33
 	"""
-	tensor = np.zeros((8, 8, 19), dtype=np.float32)
+	tensor = np.zeros((8, 8, 33), dtype=np.uint8)
 
 	# Define piece mappings (relative to current player)
 	piece_map = {"P": 0, "N": 1, "B": 2, "R": 4, "Q": 5, "K": 6}
@@ -37,7 +44,12 @@ def fast_fen_to_example(fen):
 	board_part, turn, castling_rights, en_passant = parts[0], parts[1], parts[2], parts[3]
 
 	# Identify whose turn it is
-	is_white_turn = turn == 'w'
+	is_white_turn = (turn == 'w')
+
+	piece_positions = {
+		"P_white": [], "N_white": [], "B_white": [], "D_white": [], "R_white": [], "Q_white": [], "K_white": [],
+		"P_black": [], "N_black": [], "B_black": [], "D_black": [], "R_black": [], "Q_black": [], "K_black": []
+	}
 
 	# Parse board
 	rows = board_part.split("/")
@@ -50,15 +62,32 @@ def fast_fen_to_example(fen):
 				piece_index = piece_map.get(char.upper(), None)
 				if piece_index is not None:
 					if char.upper() == "B":
+						square_sum_cond = (row_idx + col_idx) % 2 == 0
+
 						if is_white_turn:
-							piece_index = 2 if (row_idx + col_idx) % 2 == 0 else 3  # LSB (2) or DSB (3)
+							piece_index = 2 if square_sum_cond else 3  # LSB (2) or DSB (3)
+							if char.isupper():
+								char = "B" if square_sum_cond else "D"
+							else:
+								char = "b" if square_sum_cond else "d"
 						else:
-							piece_index = 3 if (row_idx + col_idx) % 2 == 0 else 2  # We need this since we do a horizontal flip
+							piece_index = 3 if square_sum_cond else 2  # We need this since we do a horizontal flip
+							if char.isupper():
+								char = "D" if square_sum_cond else "B"
+							else:
+								char = "d" if square_sum_cond else "b"
+					
+					is_white_piece = char.isupper()
 			
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player
 					else:
 						tensor[row_idx, col_idx, piece_index + opponent_offset] = 1  # Opponent
+					
+					# Store piece positions for move generation
+					piece_key = f"{char.upper()}_{'white' if is_white_piece else 'black'}"
+					piece_positions[piece_key].append((row_idx, col_idx))
+		
 				col_idx += 1
 
 	# Encode castling rights
@@ -67,14 +96,18 @@ def fast_fen_to_example(fen):
 	tensor[:, :, 7 + opponent_offset] = 'k' in castling_rights if is_white_turn else 'K' in castling_rights  # Opponent kingside
 	tensor[:, :, 8 + opponent_offset] = 'q' in castling_rights if is_white_turn else 'Q' in castling_rights  # Opponent queenside
 
-	# Encode en passant target square (Channel 14)
+	# Encode en passant target square (Channel 18)
+	row_names="87654321"
+	col_names="abcdefgh"
 	if en_passant != "-":
-		ep_square = chess.SQUARE_NAMES.index(en_passant)
-		row, col = divmod(ep_square, 8)
-		tensor[row, col, -1] = 1  # Mark en passant square
+		col = col_names.index(en_passant[0])
+		row = row_names.index(en_passant[1])
+		tensor[row, col, 18] = 1  # Mark en passant square
 
 	if not is_white_turn:
 		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks)
+	
+	tensor = chess_precomputed.generate_pseudo_legal_moves(tensor, piece_positions)
 
 	return tensor
 
@@ -89,6 +122,9 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	Returns:
 		str: Reconstructed FEN string.
 	"""
+
+	tensor = tensor[:, :, :19] # Any encodings after channel 19 are heuristics.
+	
 	# Reverse rotation if it's black's turn (since it was rotated in `fast_fen_to_example`)
 	if not is_white_turn:
 		tensor = np.flip(tensor, axis=0)  # Flip back the ranks
@@ -152,9 +188,9 @@ def tensor_to_fen(tensor, is_white_turn=True):
 		castling += "K"
 	if tensor[:, :, 8].any():  # White queenside
 		castling += "Q"
-	if tensor[:, :, 17].any():  # Black kingside
+	if tensor[:, :, 16].any():  # Black kingside
 		castling += "k"
-	if tensor[:, :, 18].any():  # Black queenside
+	if tensor[:, :, 17].any():  # Black queenside
 		castling += "q"
 	castling = castling if castling else "-"
 
@@ -162,7 +198,7 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	ep_square = "-"
 	for row in range(8):
 		for col in range(8):
-			if tensor[row, col, -1] == 1:  # Channel 18 stores en passant
+			if tensor[row, col, 18] == 1:  # Channel 19 stores en passant
 				ep_square = chess.square_name((7 - row) * 8 + col)  # Adjust for black-to-move rotation
 
 	# Construct final FEN string
@@ -210,10 +246,18 @@ def draw_chessboard(ax):
 
 def draw_pieces(ax, board):
 	"""Overlays Unicode chess pieces on the board with proper contrast."""
+	is_black_to_move = board.turn == chess.BLACK  # Detect turn
+
 	for square in chess.SQUARES:
 		piece = board.piece_at(square)
 		if piece:
-			col, row = chess.square_file(square), 7 - chess.square_rank(square)
+			col, row = chess.square_file(square), chess.square_rank(square)
+
+			# **Flip the board if Black is to move**
+			if is_black_to_move:
+				row = 7 - row
+				col = 7 - col  # Also flip the file
+
 			piece_symbol = UNICODE_PIECES[piece.symbol()]
 
 			# Determine if square is light or dark
@@ -221,8 +265,8 @@ def draw_pieces(ax, board):
 			is_white_piece = piece.color == chess.WHITE
 
 			# Set text color and outline
-			text_color = 'black' if is_white_piece else 'white'
-			outline_color = 'white' if is_white_piece else 'black'  # White outline for black pieces, black for white
+			text_color = 'white' if is_white_piece else 'black'
+			outline_color = 'black' if is_white_piece else 'white'  # White outline for black pieces, black for white
 
 			# Apply stroke effect for visibility
 			path_effects_style = [
