@@ -11,6 +11,12 @@ import os
 import core.chess_database as chess_database
 import core.chess_environment as chess_env
 
+LABEL_MAPPING = {
+	0: "Hero Win", 
+	1: "Draw",
+	2: "Villain Win"
+}
+
 def feature_extractor(model):
 	""" Extracts the last convolutional feature map. """
 	last_conv_layer = model.get_layer("last_conv")  # Extract last feature maps
@@ -32,13 +38,13 @@ def compute_activation_heatmap(feature_extractor, input_tensor):
 
 	# Convert to NumPy and normalize
 	heatmap = heatmap.numpy()
-	heatmap = np.maximum(heatmap, 0)  # ReLU
-	heatmap /= np.max(heatmap) if np.max(heatmap) != 0 else 1  # Normalize to [0,1]
+	heatmap /= np.max(np.abs(heatmap))
+	heatmap = np.tanh(heatmap)  # Tanh bro
 
 	return heatmap
 
 
-def plot_heatmap(feature_extractor, model, sample_input, path="example_map.png"):
+def plot_heatmap(feature_extractor, model, sample_input, label, path="example_map.png"):
 	""" Generates and overlays the heatmap on a chessboard with the model's prediction as a title. """
 	
 	# Compute activation heatmap
@@ -56,7 +62,7 @@ def plot_heatmap(feature_extractor, model, sample_input, path="example_map.png")
 	}
 
 	# Format title string
-	title_str = f"Hero: {prediction_dict['Hero Win']:.1f}% | Draw: {prediction_dict['Draw']:.1f}% | Villain: {prediction_dict['Villain Win']:.1f}%"
+	title_str = f"Hero: {prediction_dict['Hero Win']:.1f}% | Draw: {prediction_dict['Draw']:.1f}% | Villain: {prediction_dict['Villain Win']:.1f}%\nLabel: {LABEL_MAPPING[label.numpy()]}"
 
 	# Convert tensor to chess board
 	fig, ax = plt.subplots(figsize=(6, 6))
@@ -71,7 +77,8 @@ def plot_heatmap(feature_extractor, model, sample_input, path="example_map.png")
 	chess_env.draw_pieces(ax, board)  # Draw pieces
 
 	# Overlay Heatmap
-	heatmap_img = ax.imshow(heatmap, cmap='Reds', alpha=0.9, extent=[0, 8, 0, 8])
+	heatmap_img = ax.imshow(heatmap, cmap='seismic', alpha=1.0, extent=[0, 8, 0, 8],
+						 vmin=-1, vmax=1)
 
 	# Add Colorbar
 	plt.colorbar(heatmap_img, ax=ax, fraction=0.046, pad=0.04)
@@ -84,7 +91,7 @@ def plot_heatmap(feature_extractor, model, sample_input, path="example_map.png")
 
 if __name__ == "__main__":
 	# Load trained CNN model
-	model = tf.keras.models.load_model("models/eda_model_epoch_001.h5")
+	model = tf.keras.models.load_model("models/eda_model_epoch_022.h5")
 	
 	print("---EDA Model---")
 	model.summary()
@@ -98,13 +105,13 @@ if __name__ == "__main__":
 
 	# Iterate over 1 batch and generate heatmaps
 	for _, sample_batch in enumerate(dataset.take(1)):  
-		sample_input, _, _ = sample_batch  # Ignore labels
+		sample_input, labels, _ = sample_batch  # Ignore labels
 
 		for i, input in enumerate(sample_input.numpy()):
 			print(f"Generating heatmap for sample {i}")
 
 			# Generate and plot heatmap, save as example_{index}.png
-			plot_heatmap(feature_model, model, input, path=f"figures/eda/heatmaps/example_{i}.png")
+			plot_heatmap(feature_model, model, input, labels[i], path=f"figures/eda/heatmaps/example_{i}.png")
 
 			if (i + 1) % 100 == 0:
 				print(f"Generated {i + 1} heatmaps...")
