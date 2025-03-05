@@ -122,6 +122,9 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	Returns:
 		str: Reconstructed FEN string.
 	"""
+
+	tensor = tensor[:, :, :19] # Any encodings after channel 19 are heuristics.
+	
 	# Reverse rotation if it's black's turn (since it was rotated in `fast_fen_to_example`)
 	if not is_white_turn:
 		tensor = np.flip(tensor, axis=0)  # Flip back the ranks
