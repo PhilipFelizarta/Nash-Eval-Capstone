@@ -26,8 +26,8 @@ class TrainingPlotCallback(Callback):
 			if os.path.exists(self.log_file):
 				log_data = np.genfromtxt(self.log_file, delimiter=',', skip_header=1)
 				epochs = log_data[:, 0] if log_data.ndim > 1 else np.array([log_data[0]])
-				loss = log_data[:, 1] if log_data.ndim > 1 else np.array([log_data[1]])
-				accuracy = log_data[:, 2] if log_data.ndim > 1 else np.array([log_data[2]])
+				loss = log_data[:, 2] if log_data.ndim > 1 else np.array([log_data[2]])
+				accuracy = log_data[:, 1] if log_data.ndim > 1 else np.array([log_data[1]])
 			else:
 				return  # No data to plot yet
 
@@ -59,7 +59,7 @@ class TrainingPlotCallback(Callback):
 
 
 def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3):
-	inputs = keras.Input(shape=(8, 8, 19))
+	inputs = keras.Input(shape=(8, 8, 35))
 
 	# **Input Convolution**
 	x = layers.Conv2D(FILTERS, (3, 3), padding="same", activation=None)(inputs)

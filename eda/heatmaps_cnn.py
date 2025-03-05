@@ -91,7 +91,7 @@ def plot_heatmap(feature_extractor, model, sample_input, label, path="example_ma
 
 if __name__ == "__main__":
 	# Load trained CNN model
-	model = tf.keras.models.load_model("models/eda_model_epoch_022.h5")
+	model = tf.keras.models.load_model("models/eda_model_epoch_075.h5")
 	
 	print("---EDA Model---")
 	model.summary()

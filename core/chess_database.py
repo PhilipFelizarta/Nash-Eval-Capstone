@@ -2,6 +2,7 @@ import numpy as np
 import chess.pgn
 import zstandard as zstd
 import io
+import sys
 import tensorflow as tf
 import core.chess_environment as chess_env
 
@@ -83,7 +84,7 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 	Returns a TensorFlow Dataset streaming from a multi-threaded PGN generator.
 	"""
 	output_signature = (
-		tf.TensorSpec(shape=(None, 8, 8, 19), dtype=tf.float32),  # Input tensor batch
+		tf.TensorSpec(shape=(None, 8, 8, 35), dtype=tf.float32),  # Input tensor batch
 		tf.TensorSpec(shape=(None,), dtype=tf.int32),  # Sparse categorical labels
 		tf.TensorSpec(shape=(None,), dtype=tf.float32)  # Importance weights
 	)
@@ -100,3 +101,36 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 					 .prefetch(tf.data.experimental.AUTOTUNE)
 
 	return dataset
+
+def count_ply_and_games(zst_file, sample_count=1):
+	"""
+	Counts the total number of games and ply count in a .zst PGN file.
+	Returns the total number of games, total ply count, and a sample PGN.
+	"""
+	dctx = zstd.ZstdDecompressor()
+	with open(zst_file, "rb") as compressed:
+		with dctx.stream_reader(compressed) as reader:
+			text_stream = io.TextIOWrapper(reader, encoding="utf-8")
+			
+			total_games = 0
+			total_positions = 0
+			sample_games = []
+			
+			while True:
+				game = chess.pgn.read_game(text_stream)
+				if game is None:
+					break  # End of file
+				
+				total_games += 1
+				ply_count = sum(1 for _ in game.mainline_moves())
+				total_positions += ply_count
+				
+				if len(sample_games) < sample_count:
+					sample_games.append(str(game))
+					print(str(game))
+				
+				# Live progress update
+				sys.stdout.write(f"\rGames Processed: {total_games}, Positions Processed: {total_positions}")
+				sys.stdout.flush()
+
+			return total_games, total_positions, sample_games
