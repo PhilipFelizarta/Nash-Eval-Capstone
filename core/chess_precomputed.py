@@ -1,6 +1,6 @@
 '''
 This python file does a precomputation on import.
-Legal move generation is slow, so we precompute psuedo legal move variables 
+Legal move generation is slow, so we precompute pseudo-legal move variables 
 for fast embeddings. This should help inform the neural networks how pieces move.
 '''
 
@@ -10,6 +10,7 @@ import numpy as np
 KNIGHT_MOVES = {}
 KING_MOVES = {}
 PAWN_MOVES = {True: {}, False: {}}  # Separate for white & black pawns
+PAWN_ATTACKS = {True: {}, False: {}}  # Pawn attacks for white and black
 SLIDING_MOVES = {"R": {}, "B": {}, "Q": {}}  # Rook, Bishop, Queen
 
 
@@ -17,7 +18,7 @@ def precompute_psuedo_moves():
 	"""
 	Precomputes legal move masks for each piece type on an empty board.
 	"""
-	global KNIGHT_MOVES, KING_MOVES, PAWN_MOVES, SLIDING_MOVES
+	global KNIGHT_MOVES, KING_MOVES, PAWN_MOVES, PAWN_ATTACKS, SLIDING_MOVES
 
 	# Precompute knight moves
 	knight_offsets = [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (1, -2), (-1, 2), (-1, -2)]
@@ -43,13 +44,25 @@ def precompute_psuedo_moves():
 			if r == 1:
 				PAWN_MOVES[False][square].append((r + 2, c))  # Black double move
 
+	# Precompute pawn attacks
+	pawn_attack_offsets = {
+		True: [(-1, -1), (-1, 1)],  # White pawn attacks
+		False: [(1, -1), (1, 1)]  # Black pawn attacks
+	}
+
+	for color in [True, False]:
+		for square in range(64):
+			r, c = divmod(square, 8)
+			PAWN_ATTACKS[color][square] = [(r + dr, c + dc) for dr, dc in pawn_attack_offsets[color]
+										   if 0 <= r + dr < 8 and 0 <= c + dc < 8]
+
 	# Precompute sliding piece moves (Rook, Bishop, Queen)
 	directions = {
 		"R": [(-1, 0), (1, 0), (0, -1), (0, 1)],  # Rook: Up, Down, Left, Right
 		"B": [(-1, -1), (-1, 1), (1, -1), (1, 1)],  # Bishop: Diagonals
 		"Q": [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)],  # Queen: Rook + Bishop
 	}
-	
+
 	for piece, dirs in directions.items():
 		for square in range(64):
 			r, c = divmod(square, 8)
@@ -63,8 +76,10 @@ def precompute_psuedo_moves():
 					nc += dc
 				SLIDING_MOVES[piece][square].append(ray)
 
+
 # Call once at initialization
 precompute_psuedo_moves()
+
 
 def generate_pseudo_legal_moves(tensor, piece_positions):
 	""" Populates tensor with precomputed pseudo-legal moves for both White and Black using NumPy. """
@@ -72,6 +87,7 @@ def generate_pseudo_legal_moves(tensor, piece_positions):
 	# Move plane mapping (same for both sides)
 	move_channels = {
 		"P": (19, 26),  # Pawn: (White Plane, Black Plane)
+		"P_attack": (33, 34),  # Pawn attack planes
 		"N": (20, 27),  # Knight
 		"B": (21, 28),  # Light-Square Bishop
 		"D": (22, 29),  # Dark-Square Bishop
@@ -97,7 +113,6 @@ def generate_pseudo_legal_moves(tensor, piece_positions):
 		if not all_moves:
 			return
 
-		# Ensure `moves` is a 2D array, even if it contains only one move
 		moves = np.array(all_moves, dtype=np.int32)
 		if moves.ndim == 1:  # If `moves` is a 1D array, reshape it to (N, 2)
 			moves = moves.reshape(-1, 2)
@@ -106,7 +121,6 @@ def generate_pseudo_legal_moves(tensor, piece_positions):
 
 		if valid_moves.size > 0:
 			tensor[valid_moves[:, 0], valid_moves[:, 1], plane] = 1
-
 
 	# Process Knights
 	batch_update(tensor, piece_positions.get("N_white", []), KNIGHT_MOVES, move_channels["N"][0])
@@ -120,9 +134,8 @@ def generate_pseudo_legal_moves(tensor, piece_positions):
 	batch_update(tensor, piece_positions.get("P_white", []), PAWN_MOVES[True], move_channels["P"][0])
 	batch_update(tensor, piece_positions.get("P_black", []), PAWN_MOVES[False], move_channels["P"][1])
 
-	# Process Sliding Pieces (Rook, Queen, Light-Square & Dark-Square Bishops)
-	for piece, (white_plane, black_plane) in [("R", (23, 30)), ("Q", (24, 31)), ("B", (21, 28)), ("D", (22, 29))]:
-		batch_update(tensor, piece_positions.get(f"{piece}_white", []), SLIDING_MOVES["B" if piece in ["B", "D"] else piece], white_plane)
-		batch_update(tensor, piece_positions.get(f"{piece}_black", []), SLIDING_MOVES["B" if piece in ["B", "D"] else piece], black_plane)
+	# Process Pawn Attacks
+	batch_update(tensor, piece_positions.get("P_white", []), PAWN_ATTACKS[True], move_channels["P_attack"][0])
+	batch_update(tensor, piece_positions.get("P_black", []), PAWN_ATTACKS[False], move_channels["P_attack"][1])
 
 	return tensor

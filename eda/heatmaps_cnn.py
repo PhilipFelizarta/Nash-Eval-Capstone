@@ -90,8 +90,19 @@ def plot_heatmap(feature_extractor, model, sample_input, label, path="example_ma
 	plt.close()
 
 if __name__ == "__main__":
+	import argparse
+
+	parser = argparse.ArgumentParser(
+		prog="HEATMAP GENERATOR",
+		description="Type a model in to generate heatmaps for"
+	)
+
+	parser.add_argument("--model", type=str)
+	args = parser.parse_args()
+
+
 	# Load trained CNN model
-	model = tf.keras.models.load_model("models/eda_model_epoch_022.h5")
+	model = tf.keras.models.load_model(f"models/{args.model}.h5")
 	
 	print("---EDA Model---")
 	model.summary()
@@ -111,7 +122,7 @@ if __name__ == "__main__":
 			print(f"Generating heatmap for sample {i}")
 
 			# Generate and plot heatmap, save as example_{index}.png
-			plot_heatmap(feature_model, model, input, labels[i], path=f"figures/eda/heatmaps/example_{i}.png")
+			plot_heatmap(feature_model, model, input, labels[i], path=f"figures/eda/heatmaps/{args.model}/example_{i}.png")
 
 			if (i + 1) % 100 == 0:
 				print(f"Generated {i + 1} heatmaps...")

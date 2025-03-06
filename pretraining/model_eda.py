@@ -14,7 +14,7 @@ import core.model_framework as model_framework
 from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 
 if __name__ == "__main__":
-	model = model_framework.exploratory_model()
+	model = model_framework.exploratory_model(lr=1e-5, FILTERS=256)
 
 	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=64).repeat()
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 	plot_callback = model_framework.TrainingPlotCallback(save_interval=1, plot_path="figures/training/eda_model_training.png")
 
 	# Train model and capture history
-	history = model.fit(dataset, epochs=50, steps_per_epoch=100000, callbacks=[checkpoint_callback, csv_logger, plot_callback])
+	history = model.fit(dataset, epochs=1000, steps_per_epoch=100000, callbacks=[checkpoint_callback, csv_logger, plot_callback], verbose=2)
 
 	# Save model
 	model.save("models/eda_model.h5")

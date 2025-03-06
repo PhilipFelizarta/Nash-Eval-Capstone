@@ -17,6 +17,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY core/chess_database.py core/chess_database.py
 COPY core/chess_environment.py core/chess_environment.py
 COPY core/model_framework.py core/model_framework.py
+COPY core/chess_precomputed.py core/chess_precomputed.py
+
 COPY pretraining/model_eda.py script.py
 
 # Set environment variables for TensorFlow GPU

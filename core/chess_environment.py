@@ -31,9 +31,9 @@ def fast_fen_to_example(fen):
 
 	Returns:
 		np.ndarray: (8, 8, 19) tensor representation of the board. ---> directly to fen
-		The next 14 channels encode the psuedo legal moves. 20 -> 33
+		The next 14 channels encode the psuedo legal moves. 20 -> 35
 	"""
-	tensor = np.zeros((8, 8, 33), dtype=np.uint8)
+	tensor = np.zeros((8, 8, 35), dtype=np.uint8)
 
 	# Define piece mappings (relative to current player)
 	piece_map = {"P": 0, "N": 1, "B": 2, "R": 4, "Q": 5, "K": 6}
@@ -124,7 +124,7 @@ def tensor_to_fen(tensor, is_white_turn=True):
 	"""
 
 	tensor = tensor[:, :, :19] # Any encodings after channel 19 are heuristics.
-	
+
 	# Reverse rotation if it's black's turn (since it was rotated in `fast_fen_to_example`)
 	if not is_white_turn:
 		tensor = np.flip(tensor, axis=0)  # Flip back the ranks
