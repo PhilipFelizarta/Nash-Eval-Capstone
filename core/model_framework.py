@@ -123,3 +123,50 @@ def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3
 	)
 
 	return model
+
+
+# Attention is all you need
+def transformer_block(x, embed_dim, num_heads, ff_dim, dropout_rate):
+	"""Defines a single Transformer block."""
+	attn_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)(x, x)
+	attn_output = layers.Dropout(dropout_rate)(attn_output)
+	x = layers.LayerNormalization(epsilon=1e-6)(x + attn_output)  # Skip connection & LayerNorm
+
+	ffn_output = layers.Dense(ff_dim, activation="relu")(x)
+	ffn_output = layers.Dense(embed_dim)(ffn_output)
+	ffn_output = layers.Dropout(dropout_rate)(ffn_output)
+
+	return layers.LayerNormalization(epsilon=1e-6)(x + ffn_output)  # Skip connection & LayerNorm
+
+def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1, lr=5e-4):
+	"""Builds the Transformer model for chess position evaluation."""
+	inputs = layers.Input(shape=(8, 8, 35))  # 64 squares, each with a 35-dim vector
+	x = layers.Reshape((64, 35))(inputs)
+	
+	# Trainable Positional Embedding for each square (64 positions)
+	square_indices = tf.range(64)  # [0, 1, ..., 63]
+	pos_embedding = layers.Embedding(input_dim=64, output_dim=16)(square_indices)  # 16-dim trainable positional embedding
+	
+	# Expand dimensions to match batch size dynamically
+	pos_embedding = tf.expand_dims(pos_embedding, axis=0)  # Shape: (1, 64, 16)
+	pos_embedding = tf.tile(pos_embedding, [tf.shape(x)[0], 1, 1])  # Shape: (batch_size, 64, 16)
+	
+	# Concatenate the piece representation (35-dim) with positional encoding (16-dim)
+	x = layers.Concatenate(axis=-1)([x, pos_embedding])  # New shape: (64, 51)
+	
+	# Pass through Transformer Blocks
+	x = layers.Dense(n_dim, activation="relu")(x)  # Token embedding
+
+	for _ in range(n_blocks):
+		x = transformer_block(x, n_dim, n_heads, ff_dim, dropout_rate)
+
+	x = layers.GlobalAveragePooling1D()(x)  # Aggregate token outputs
+	outputs = layers.Dense(3, activation="softmax")(x)  # Win, Draw, Loss classification
+
+	model = Model(inputs, outputs)
+	model.compile(
+		optimizer=keras.optimizers.Adam(learning_rate=lr),
+		loss=keras.losses.SparseCategoricalCrossentropy(),
+		metrics=['accuracy']
+	)
+	return model

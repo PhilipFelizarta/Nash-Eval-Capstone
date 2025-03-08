@@ -1,12 +1,12 @@
 version: "3.8"
 
 services:
-  chess_pretrain:
+  chess_eda_training:
     build:
       context: .
-      dockerfile: Dockerfile.pretrain  # Explicitly specify the Dockerfile
-    image: chess_pretrain  # Name of the built image
-    container_name: chess_pretrain_container
+      dockerfile: Dockerfile.eda  # Explicitly specify the Dockerfile
+    image: chess_eda  # Name of the built image
+    container_name: chess_edatrain_container
     runtime: nvidia  # Ensures GPU access
     deploy:
       resources:
