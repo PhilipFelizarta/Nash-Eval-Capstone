@@ -33,13 +33,10 @@ def find_models(model_folder, N_players=None):
 	if N_players is None or N_players >= len(all_models):
 		return all_models  # Use all models if not capping
 
-	# Always include the first and last model
-	selected_models = [all_models[0], all_models[-1]]
-
 	if N_players > 2:
-		remaining_models = all_models[1:-1]  # Exclude first and last
-		indices = np.linspace(0, len(remaining_models) - 1, N_players - 2, dtype=int)
-		selected_models += [remaining_models[i] for i in indices]
+		remaining_models = all_models
+		indices = np.linspace(0, len(remaining_models) - 1, N_players, dtype=int)
+		selected_models = [remaining_models[i] for i in indices]
 
 	return selected_models
 
@@ -76,30 +73,38 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
 		"results": []
 	}
 
-	# Create all possible matchups (including self-play)
+	# Create all possible matchups (exclude self-play)
 	for idx_a, idx_b in product(range(N), repeat=2):
 		model_a = models[idx_a]
 		model_b = models[idx_b]
+
+		print(f"Matchup: {model_a} vs {model_b}")
 		matchup_folder = os.path.join(tournament_folder, f"{os.path.basename(model_a)}_{os.path.basename(model_b)}")
 		os.makedirs(matchup_folder, exist_ok=True)
 
 		# Each pair plays M times as White/Black
-		for i in range(M):
-			game_path = os.path.join(matchup_folder, f"game_{i}.pgn")
-			result = self_play_game_stochastic(model_a, model_b, game_path, temp=temp)
+		if idx_a != idx_b:
+			for i in range(M):
+				game_path = os.path.join(matchup_folder, f"game_{i}.pgn")
+				result = self_play_game_stochastic(model_a, model_b, game_path, temp=temp, max_moves=50)
 
-			# Update winrate matrix from White's perspective
-			if result == "1-0":
-				winrate_matrix[idx_a, idx_b] += 1  # White won
-			elif result == "1/2-1/2":
-				winrate_matrix[idx_a, idx_b] += 0.5  # Draw
-			elif result == "0-1":
-				pass  # Black won; no need to update White's winrate
-			else:
-				winrate_matrix[idx_a, idx_b] += 0.5  # Any other case, count as a draw
+				# Update winrate matrix from White's perspective
+				if result == "1-0":
+					winrate_matrix[idx_a, idx_b] += 1  # White won
+				elif result == "1/2-1/2":
+					winrate_matrix[idx_a, idx_b] += 0.5  # Draw
+				elif result == "0-1":
+					pass  # Black won; no need to update White's winrate
+				else:
+					winrate_matrix[idx_a, idx_b] += 0.5  # Any other case, count as a draw
 
-			match_counts[idx_a, idx_b] += 1  # Increment game count
-			
+				match_counts[idx_a, idx_b] += 1  # Increment game count
+		else:
+			winrate_matrix[idx_a, idx_a] = float(M)/2
+			match_counts[idx_a, idx_a] = M
+		
+		print(f"Matchup: {model_a} vs {model_b}: {winrate_matrix[idx_a, idx_b]} - {match_counts[idx_a, idx_b]-winrate_matrix[idx_a, idx_b]}")
+
 	# Normalize winrate matrix
 	with np.errstate(divide="ignore", invalid="ignore"):
 		winrate_matrix = np.where(match_counts > 0, winrate_matrix / match_counts, 0)
@@ -118,8 +123,8 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
 
 if __name__ == "__main__":
 	model_folder = "models/eda_cnn"  # Path to models
-	N_players = 2  # Max number of models in the tournament
-	M = 1  # Number of games per matchup (per color)
+	N_players = 10  # Max number of models in the tournament
+	M = 2  # Number of games per matchup (per color)
 	temp = 1 / 100.0  # Exploration parameter
 
 	run_tournament(model_folder, N_players, M, temp)

@@ -1,0 +1,12 @@
+{
+    "timestamp": "20250308_194822",
+    "num_models": 3,
+    "num_games_per_matchup": 5,
+    "temperature": 0.01,
+    "models": {
+        "0": "eda_model_epoch_001.h5",
+        "1": "eda_model_epoch_076.h5",
+        "2": "eda_model_epoch_002.h5"
+    },
+    "results": []
+}

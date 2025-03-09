@@ -47,7 +47,7 @@ def select_stochastic_move(board, model, temp=1.0):
 
 	# Convert to batch and get model predictions
 	position_tensors = np.array(position_tensors)
-	predictions = model.predict(position_tensors, batch_size=len(position_tensors))
+	predictions = model.predict(position_tensors, batch_size=len(position_tensors), verbose=0)
 
 	# **Override Model Predictions for Draws**
 	for i, move in move_map.items():
@@ -65,7 +65,7 @@ def select_stochastic_move(board, model, temp=1.0):
 	return move_map[selected_index], predictions[selected_index]
 
 
-def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.0):
+def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.0, max_moves=100):
 	"""
 	Runs a stochastic self-play game between two models and saves the PGN with WDL evaluations.
 
@@ -106,10 +106,8 @@ def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.
 
 		turn_count += 1
 
-		# Print board state every 10 moves
-		if turn_count % 10 == 0:
-			print(f"Move {turn_count}: {best_move}, WDL: {w}/{d}/{l}")
-			print(board)
+		if turn_count > max_moves * 2:
+			break
 
 	# Save the PGN file with WDL evaluations
 	with open(pgn_save_path, "w", encoding="utf-8") as pgn_file:
