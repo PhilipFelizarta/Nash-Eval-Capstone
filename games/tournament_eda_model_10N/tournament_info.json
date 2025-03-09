@@ -1,0 +1,19 @@
+{
+    "timestamp": "20250308_202631",
+    "num_models": 10,
+    "num_games_per_matchup": 2,
+    "temperature": 0.01,
+    "models": {
+        "0": "eda_model_epoch_001.h5",
+        "1": "eda_model_epoch_009.h5",
+        "2": "eda_model_epoch_017.h5",
+        "3": "eda_model_epoch_026.h5",
+        "4": "eda_model_epoch_034.h5",
+        "5": "eda_model_epoch_042.h5",
+        "6": "eda_model_epoch_051.h5",
+        "7": "eda_model_epoch_059.h5",
+        "8": "eda_model_epoch_067.h5",
+        "9": "eda_model_epoch_076.h5"
+    },
+    "results": []
+}
