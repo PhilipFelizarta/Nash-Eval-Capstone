@@ -96,7 +96,7 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 
 	# Parallel loading and prefetching for speedup
 	dataset = dataset.shuffle(buffer_size) \
-					 .map(lambda x, y, w: (tf.py_function(lambda a: a, [x], tf.float32), y, w),
+					 .map(lambda x, y, w: (tf.cast(x, tf.float32), y, w),
 						  num_parallel_calls=num_parallel_calls) \
 					 .prefetch(tf.data.experimental.AUTOTUNE)
 

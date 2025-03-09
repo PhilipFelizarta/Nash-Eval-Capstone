@@ -155,4 +155,4 @@ def plot_piece_density_by_label(zst_file, sample_size=100000):
 
 if __name__ == "__main__":
 	zst_file = "data\LumbrasGigaBase 2024.pgn.zst"
-	plot_piece_density_by_label(zst_file, sample_size=100000)
+	plot_piece_density_by_label(zst_file, sample_size=1000000)

@@ -1,0 +1,29 @@
+# Use NVIDIA TensorFlow with CUDA support
+FROM nvcr.io/nvidia/tensorflow:23.12-tf2-py3
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y python3-pip git && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for caching
+COPY pretraining/pretraining_requirements.txt requirements.txt
+
+# Install Python dependencies
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy the entire project into the container
+COPY core/chess_database.py core/chess_database.py
+COPY core/chess_environment.py core/chess_environment.py
+COPY core/model_framework.py core/model_framework.py
+COPY core/chess_precomputed.py core/chess_precomputed.py
+
+COPY pretraining/pretrain_script.py script.py
+
+# Set environment variables for TensorFlow GPU
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+# Command to run the pretraining script
+CMD ["python3", "script.py"]
