@@ -23,5 +23,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/x86_64-linux-gnu
+      - N_BLOCKS=1
+      - N_HEADS=8
+      - N_DIM=128
+      - FF_DIM=128
     command: ["python", "/app/script.py"]
     working_dir: /app
