@@ -1,0 +1,11 @@
+Model,Nash_Probability
+models/eda_cnn\eda_model_epoch_001.h5,0.1828546357074914
+models/eda_cnn\eda_model_epoch_009.h5,0.03612253830004252
+models/eda_cnn\eda_model_epoch_017.h5,0.0007392454378906274
+models/eda_cnn\eda_model_epoch_026.h5,0.013015587032317992
+models/eda_cnn\eda_model_epoch_034.h5,0.17008995071810287
+models/eda_cnn\eda_model_epoch_042.h5,0.08652446027403916
+models/eda_cnn\eda_model_epoch_051.h5,0.09033524538171965
+models/eda_cnn\eda_model_epoch_059.h5,0.08911499155583305
+models/eda_cnn\eda_model_epoch_067.h5,0.13532607936463042
+models/eda_cnn\eda_model_epoch_076.h5,0.1958772662279323

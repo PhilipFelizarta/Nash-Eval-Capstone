@@ -1,0 +1,9 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "models/eda_cnn\eda_model_epoch_067.h5"]
+[Black "models/eda_cnn\eda_model_epoch_042.h5"]
+[Result "*"]
+
+1. d3 { WDL: 0.45/0.14/0.42 } 1... b6 { WDL: 0.45/0.08/0.46 } 2. e4 { WDL: 0.46/0.12/0.42 } 2... h6 { WDL: 0.43/0.07/0.50 } 3. Bd2 { WDL: 0.47/0.11/0.42 } 3... f6 { WDL: 0.43/0.07/0.50 } 4. Na3 { WDL: 0.47/0.11/0.42 } 4... g5 { WDL: 0.45/0.06/0.48 } 5. Qh5# { WDL: 1.00/0.00/0.00 } *

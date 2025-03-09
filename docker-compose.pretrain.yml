@@ -13,19 +13,21 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: all  # ✅ Use all available GPUs
               capabilities: [gpu]
     volumes:
       - ./data:/app/data  # Mounts host data directory to /app/data
       - ./models:/app/models
       - ./figures:/app/figures
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_VISIBLE_DEVICES=all  # ✅ Ensures all GPUs are visible
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/x86_64-linux-gnu
-      - N_BLOCKS=1
+      - TF_CPP_MIN_LOG_LEVEL=2  # ✅ Reduces TensorFlow logging noise
+      - TF_GPU_ALLOCATOR=cuda_malloc_async  # ✅ Optimizes GPU memory allocation
+      - N_BLOCKS=8
       - N_HEADS=8
-      - N_DIM=128
-      - FF_DIM=128
-    command: ["python", "/app/script.py"]
+      - N_DIM=256
+      - FF_DIM=256
+    command: ["python", "/app/pretrain_script.py"]  # ✅ Ensure correct script is executed
     working_dir: /app
