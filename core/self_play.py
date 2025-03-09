@@ -119,13 +119,3 @@ def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.
 
 	# Return the game result
 	return board.result()
-
-
-if __name__ == "__main__":
-	model_a_path = "model_a.h5"
-	model_b_path = "model_b.h5"
-	pgn_save_path = "self_play_game_stochastic.pgn"
-	temp = 0.8  # Adjust for exploration
-
-	result = self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=temp)
-	print(f"Game result: {result}")

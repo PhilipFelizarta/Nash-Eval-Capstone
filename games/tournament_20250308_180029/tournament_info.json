@@ -1,0 +1,36 @@
+{
+    "timestamp": "20250308_180029",
+    "num_models": 2,
+    "num_games_per_matchup": 1,
+    "temperature": 0.01,
+    "models": {
+        "0": "eda_model_epoch_001.h5",
+        "1": "eda_model_epoch_076.h5"
+    },
+    "results": [
+        {
+            "white": "eda_model_epoch_001.h5",
+            "black": "eda_model_epoch_001.h5",
+            "game_id": 0,
+            "result": "0-1"
+        },
+        {
+            "white": "eda_model_epoch_001.h5",
+            "black": "eda_model_epoch_076.h5",
+            "game_id": 0,
+            "result": "1/2-1/2"
+        },
+        {
+            "white": "eda_model_epoch_076.h5",
+            "black": "eda_model_epoch_001.h5",
+            "game_id": 0,
+            "result": "1/2-1/2"
+        },
+        {
+            "white": "eda_model_epoch_076.h5",
+            "black": "eda_model_epoch_076.h5",
+            "game_id": 0,
+            "result": "1/2-1/2"
+        }
+    ]
+}
