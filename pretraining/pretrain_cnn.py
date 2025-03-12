@@ -16,9 +16,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 
 if __name__ == "__main__":
 	n_blocks = int(os.getenv("N_BLOCKS"))
-	n_heads = int(os.getenv("N_HEADS"))
-	n_dim = int(os.getenv("N_DIM"))
-	ff_dim = int(os.getenv("FF_DIM"))
+	n_filters = int(os.getenv("N_FILTERS"))
 
 	strategy = tf.distribute.MirroredStrategy()
 	BATCH_SIZE = 64
@@ -29,7 +27,7 @@ if __name__ == "__main__":
 	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=GLOBAL_BATCH_SIZE).repeat()
 
-	model_name = f"transformer_flat_{n_blocks}x{n_heads}-n_dim={n_dim}-ff_dim-{ff_dim}"
+	model_name = f"RESNET_{n_blocks}x{n_filters}"
 	print(dataset.take(1))
 
 	os.makedirs("models", exist_ok=True)
@@ -37,8 +35,8 @@ if __name__ == "__main__":
 	os.makedirs("figures", exist_ok=True)
 
 	with strategy.scope():
-		model = model_framework.create_chess_transformer(
-			n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1, lr=1e-5
+		model = model_framework.exploratory_model(
+			FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-6=5
 		)
 
 	model.summary()
@@ -55,7 +53,7 @@ if __name__ == "__main__":
 	history = model.fit(
 		dataset,
 		epochs=1000,
-		steps_per_epoch=10000,
+		steps_per_epoch=100000,
 		callbacks=[checkpoint_callback, csv_logger, plot_callback],
 		verbose=2
 	)

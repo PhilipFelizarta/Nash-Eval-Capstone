@@ -25,7 +25,7 @@ def pgn_zst_generator(zst_file, batch_size=32):
 	"""
 	dctx = zstd.ZstdDecompressor()
 	with open(zst_file, "rb") as compressed:
-		with dctx.stream_reader(compressed) as reader:
+		with dctx.stream_reader(compressed, read_across_frames=True) as reader:
 			text_stream = io.TextIOWrapper(reader, encoding="utf-8")
 
 			game_data = []
