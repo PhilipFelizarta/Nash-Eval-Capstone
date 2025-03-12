@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
 	with strategy.scope():
 		model = model_framework.exploratory_model(
-			FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-6=5
+			FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-5
 		)
 
 	model.summary()
