@@ -1,0 +1,9 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "models/transformer_flat_2x32-n_dim=512-ff_dim-512\transformer_flat_2x32-n_dim=512-ff_dim-512_066.h5"]
+[Black "models/transformer_flat_2x32-n_dim=512-ff_dim-512\transformer_flat_2x32-n_dim=512-ff_dim-512_001.h5"]
+[Result "*"]
+
+1. d3 { WDL: 0.54/0.02/0.44 } 1... d5 { WDL: 0.43/0.30/0.27 } 2. a3 { WDL: 0.53/0.02/0.45 } 2... Bh3 { WDL: 0.52/0.25/0.23 } 3. Ra2 { WDL: 0.56/0.02/0.42 } 3... Bxg2 { WDL: 0.76/0.14/0.11 } 4. a4 { WDL: 0.56/0.02/0.42 } 4... Nh6 { WDL: 0.80/0.08/0.11 } 5. Nh3 { WDL: 0.55/0.02/0.43 } 5... Rg8 { WDL: 0.87/0.03/0.10 } 6. e4 { WDL: 0.61/0.01/0.38 } 6... Bxe4 { WDL: 0.88/0.03/0.09 } 7. Qg4 { WDL: 0.62/0.01/0.37 } 7... Bf3 { WDL: 0.89/0.02/0.09 } 8. Ng5 { WDL: 0.62/0.01/0.37 } 8... Qc8 { WDL: 0.89/0.02/0.09 } 9. Qxc8# { WDL: 1.00/0.00/0.00 } *

@@ -122,8 +122,8 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
 
 
 if __name__ == "__main__":
-	model_folder = "models/eda_cnn"  # Path to models
-	N_players = 10  # Max number of models in the tournament
+	model_folder = "models/transformer_flat_2x32-n_dim=512-ff_dim-512"  # Path to models
+	N_players = 3  # Max number of models in the tournament
 	M = 2  # Number of games per matchup (per color)
 	temp = 1 / 100.0  # Exploration parameter
 

@@ -7,6 +7,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+tf.keras.mixed_precision.set_global_policy("mixed_float16")
+
 class TrainingPlotCallback(Callback):
 	""" Callback to update the training plot every 10 epochs """
 	def __init__(self, save_interval=10, plot_path="figures/eda_model_training.png", log_file="logs/training_log.csv"):
@@ -101,14 +103,14 @@ def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3
 		x = residual_block(x)
 
 	# **Value Head**
-	v = layers.Conv2D(32, (1, 1), padding="same", activation=None, name="last_conv")(x)
+	v = layers.Conv2D(32, (1, 1), padding="same", activation=None)(x)
 	v = layers.BatchNormalization()(v)
 	v = layers.ReLU()(v)
-	
-	v = layers.Conv2D(1, (1, 1), padding="same", activation=None)(v)
+	v = layers.Conv2D(1, (1, 1), padding="same", activation=None, name="last_conv")(v)
 	v = layers.BatchNormalization()(v)
 	v = layers.ReLU()(v)
 	v = layers.Flatten()(v)
+
 	v = layers.Dropout(dropout)(v)  # Dropout before dense layer
 	v = layers.Dense(128, activation="relu")(v)
 	v = layers.Dropout(dropout)(v)  # Dropout after dense layer
@@ -124,11 +126,10 @@ def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3
 
 	return model
 
-
 # Attention is all you need
 def transformer_block(x, embed_dim, num_heads, ff_dim, dropout_rate):
 	"""Defines a single Transformer block."""
-	attn_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)(x, x)
+	attn_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim // num_heads)(x, x)
 	attn_output = layers.Dropout(dropout_rate)(attn_output)
 	x = layers.LayerNormalization(epsilon=1e-6)(x + attn_output)  # Skip connection & LayerNorm
 
@@ -138,21 +139,38 @@ def transformer_block(x, embed_dim, num_heads, ff_dim, dropout_rate):
 
 	return layers.LayerNormalization(epsilon=1e-6)(x + ffn_output)  # Skip connection & LayerNorm
 
+def chess_positional_encoding():
+	"""Creates a handcrafted positional encoding for an 8x8 chessboard."""
+	row_indices = tf.range(8, dtype=tf.float32)
+	col_indices = tf.range(8, dtype=tf.float32)
+	
+	row_indices = (row_indices - 3.5) / 3.5  # Normalize row index to [-1,1]
+	col_indices = (col_indices - 3.5) / 3.5  # Normalize col index to [-1,1]
+	
+	# Create a grid of row and column positions
+	row_grid, col_grid = tf.meshgrid(row_indices, col_indices, indexing='ij')  # Shape (8,8)
+
+	# Compute sinusoidal embeddings
+	pos_encodings = tf.stack([
+		tf.sin(row_grid), tf.cos(row_grid),
+		tf.sin(col_grid), tf.cos(col_grid),
+		row_grid, col_grid  # Include raw normalized values as well
+	], axis=-1)  # Shape: (8, 8, 6)
+
+	return tf.reshape(pos_encodings, (64, 6))  # Flatten the board to (64, 6)
+
 def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1, lr=5e-4):
 	"""Builds the Transformer model for chess position evaluation."""
-	inputs = layers.Input(shape=(8, 8, 35))  # 64 squares, each with a 35-dim vector
-	x = layers.Reshape((64, 35))(inputs)
+	inputs = layers.Input(shape=(8, 8, 35))  # 8x8 board with 35 channels
+	x = layers.Reshape((64, 35))(inputs)  # Flatten board
 	
-	# Trainable Positional Embedding for each square (64 positions)
-	square_indices = tf.range(64)  # [0, 1, ..., 63]
-	pos_embedding = layers.Embedding(input_dim=64, output_dim=16)(square_indices)  # 16-dim trainable positional embedding
-	
-	# Expand dimensions to match batch size dynamically
-	pos_embedding = tf.expand_dims(pos_embedding, axis=0)  # Shape: (1, 64, 16)
-	pos_embedding = tf.tile(pos_embedding, [tf.shape(x)[0], 1, 1])  # Shape: (batch_size, 64, 16)
-	
-	# Concatenate the piece representation (35-dim) with positional encoding (16-dim)
-	x = layers.Concatenate(axis=-1)([x, pos_embedding])  # New shape: (64, 51)
+	# Compute fixed positional encodings
+	pos_encoding = chess_positional_encoding()  # (64, 6)
+	pos_encoding = tf.expand_dims(pos_encoding, axis=0)  # Shape: (1, 64, 6)
+	pos_encoding = tf.tile(pos_encoding, [tf.shape(x)[0], 1, 1])  # Shape: (batch_size, 64, 6)
+
+	# Concatenate position encoding with piece embeddings
+	x = layers.Concatenate(axis=-1)([x, pos_encoding])  # New shape: (64, 41)
 	
 	# Pass through Transformer Blocks
 	x = layers.Dense(n_dim, activation="relu")(x)  # Token embedding
@@ -160,12 +178,20 @@ def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1,
 	for _ in range(n_blocks):
 		x = transformer_block(x, n_dim, n_heads, ff_dim, dropout_rate)
 
-	x = layers.GlobalAveragePooling1D()(x)  # Aggregate token outputs
+	x = layers.Flatten()(x)
 	outputs = layers.Dense(3, activation="softmax")(x)  # Win, Draw, Loss classification
 
 	model = Model(inputs, outputs)
+	nadam_optimizer = keras.optimizers.Nadam(
+		learning_rate=lr,
+		beta_1=0.9,
+		beta_2=0.98,
+		epsilon=1e-7,
+		clipnorm=10  # Gradient Clipping
+	)
+
 	model.compile(
-		optimizer=keras.optimizers.Adam(learning_rate=lr),
+		optimizer=nadam_optimizer,
 		loss=keras.losses.SparseCategoricalCrossentropy(),
 		metrics=['accuracy']
 	)
