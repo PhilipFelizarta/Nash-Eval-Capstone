@@ -56,8 +56,8 @@ def select_stochastic_move(board, model, temp=1.0):
 			predictions[i] = np.array([0.0, 1.0, 0.0])  # Force draw to be neutral (WDL = 0)
 		board.pop()
 
-	# **Compute Softmax Over (Win - Loss) / Temperature**
-	move_values = (predictions[:, 2] - predictions[:, 0]) / temp
+	# **Compute Softmax Over (Win) / Temperature**
+	move_values = (predictions[:, 2]) / temp
 	move_probabilities = softmax(move_values)
 
 	# **Select Move Stochastically**
@@ -79,8 +79,8 @@ def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.
 		str: The final result of the game ("1-0", "0-1", "1/2-1/2").
 	"""
 	# Load models
-	model_a = load_model(model_a_path)
-	model_b = load_model(model_b_path)
+	model_a = load_model(model_a_path, compile=False)
+	model_b = load_model(model_b_path, compile=False)
 
 	board = chess.Board()
 	game = chess.pgn.Game()

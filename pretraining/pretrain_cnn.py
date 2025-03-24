@@ -27,7 +27,7 @@ if __name__ == "__main__":
 	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=GLOBAL_BATCH_SIZE).repeat()
 
-	model_name = f"RESNET_{n_blocks}x{n_filters}"
+	model_name = f"RESNET_36p_{n_blocks}x{n_filters}"
 	print(dataset.take(1))
 
 	os.makedirs("models", exist_ok=True)

@@ -68,7 +68,7 @@ def play_matchup(idx_a, idx_b, model_a, model_b, matchup_folder, M, temp):
 	return results
 
 
-def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
+def run_tournament(model_folder, N_players=8, M=5, temp=0.8, workers=4):
 	"""
 	Runs a round-robin tournament using multiprocessing.
 	"""
@@ -95,7 +95,7 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
 	}
 
 	# Run matchups in parallel
-	with ProcessPoolExecutor() as executor:
+	with ProcessPoolExecutor(max_workers=workers) as executor:
 		futures = []
 		for idx_a, idx_b in product(range(N), repeat=2):
 			model_a = models[idx_a]
@@ -133,11 +133,12 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8):
 
 
 if __name__ == "__main__":
-	model_folder = "models/RESNET_4x512"
+	model_folder = "models/RESNET_36p_4x512"
 	N_players = int(os.getenv("N_PLAYERS"))
 	M = int(os.getenv("N_GAMES"))
 	temp = float(os.getenv("TEMP"))
+	workers = int(os.getenv("WORKERS"))
 	
-	print("Number of Cores used: ", os.cpu_count())  # Number of workers being used by default
+	print("Number of workers used: ", workers)  # Number of workers being used by default
 
-	run_tournament(model_folder, N_players, M, temp)
+	run_tournament(model_folder, N_players, M, temp, workers)

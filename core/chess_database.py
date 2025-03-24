@@ -84,7 +84,7 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 	Returns a TensorFlow Dataset streaming from a multi-threaded PGN generator.
 	"""
 	output_signature = (
-		tf.TensorSpec(shape=(None, 8, 8, 35), dtype=tf.float32),  # Input tensor batch
+		tf.TensorSpec(shape=(None, 8, 8, 36), dtype=tf.float32),  # Input tensor batch
 		tf.TensorSpec(shape=(None,), dtype=tf.int32),  # Sparse categorical labels
 		tf.TensorSpec(shape=(None,), dtype=tf.float32)  # Importance weights
 	)

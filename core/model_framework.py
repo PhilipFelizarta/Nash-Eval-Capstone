@@ -61,7 +61,7 @@ class TrainingPlotCallback(Callback):
 
 
 def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3):
-	inputs = keras.Input(shape=(8, 8, 35))
+	inputs = keras.Input(shape=(8, 8, 36))
 
 	# **Input Convolution**
 	x = layers.Conv2D(FILTERS, (3, 3), padding="same", activation=None)(inputs)
@@ -161,8 +161,8 @@ def chess_positional_encoding():
 
 def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1, lr=5e-4):
 	"""Builds the Transformer model for chess position evaluation."""
-	inputs = layers.Input(shape=(8, 8, 35))  # 8x8 board with 35 channels
-	x = layers.Reshape((64, 35))(inputs)  # Flatten board
+	inputs = layers.Input(shape=(8, 8, 36))  # 8x8 board with 35 channels
+	x = layers.Reshape((64, 36))(inputs)  # Flatten board
 	
 	# Compute fixed positional encodings
 	pos_encoding = chess_positional_encoding()  # (64, 6)

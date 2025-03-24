@@ -24,7 +24,10 @@ def fast_fen_to_example(fen):
 		- Board flips when black to move to maintain hero/villian representation.
 
 	Extra encoding layers.
-		Channel 20-32 encodes peusdo-legal move maps for each piece type.
+		Channel 20-35 encodes peusdo-legal move maps for each piece type.
+
+	Engineered Features
+		Channel 36 encodes material imbalance
 
 	Args:
 		fen (str): Chess position in FEN notation.
@@ -33,11 +36,13 @@ def fast_fen_to_example(fen):
 		np.ndarray: (8, 8, 19) tensor representation of the board. ---> directly to fen
 		The next 14 channels encode the psuedo legal moves. 20 -> 35
 	"""
-	tensor = np.zeros((8, 8, 35), dtype=np.uint8)
+	tensor = np.zeros((8, 8, 36), dtype=np.float32)
 
 	# Define piece mappings (relative to current player)
 	piece_map = {"P": 0, "N": 1, "B": 2, "R": 4, "Q": 5, "K": 6}
 	opponent_offset = 9  # Opponent pieces stored at index 9+
+
+	piece_values = {"P": 1, "N": 3, "B": 3.1, "D": 3.1, "R": 5, "Q": 9}
 
 	# Split FEN into components
 	parts = fen.split()
@@ -50,6 +55,9 @@ def fast_fen_to_example(fen):
 		"P_white": [], "N_white": [], "B_white": [], "D_white": [], "R_white": [], "Q_white": [], "K_white": [],
 		"P_black": [], "N_black": [], "B_black": [], "D_black": [], "R_black": [], "Q_black": [], "K_black": []
 	}
+
+	material_hero = 0
+	material_villain = 0
 
 	# Parse board
 	rows = board_part.split("/")
@@ -81,8 +89,10 @@ def fast_fen_to_example(fen):
 			
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player
+						material_hero += piece_values.get(char.upper(), 0)
 					else:
 						tensor[row_idx, col_idx, piece_index + opponent_offset] = 1  # Opponent
+						material_villain += piece_values.get(char.upper(), 0)
 					
 					# Store piece positions for move generation
 					piece_key = f"{char.upper()}_{'white' if is_white_piece else 'black'}"
@@ -109,6 +119,7 @@ def fast_fen_to_example(fen):
 	
 	tensor = chess_precomputed.generate_pseudo_legal_moves(tensor, piece_positions)
 
+	tensor[:, :, 35] = (material_hero -  material_villain) / 40.2 # Material imbalance feature
 	return tensor
 
 def tensor_to_fen(tensor, is_white_turn=True):
