@@ -27,7 +27,8 @@ if __name__ == "__main__":
 	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
 	dataset = chess_database.get_tf_dataset(zst_file, batch_size=GLOBAL_BATCH_SIZE).repeat()
 
-	model_name = f"RESNET_36p_{n_blocks}x{n_filters}"
+	model_name = f"PART2_RESNET_36p_{n_blocks}x{n_filters}"
+	model_path =f"models/RESNET_36p_{n_blocks}x{n_filters}/RESNET_36p_4x512_022.h5"
 	print(dataset.take(1))
 
 	os.makedirs("models", exist_ok=True)
@@ -35,9 +36,20 @@ if __name__ == "__main__":
 	os.makedirs("figures", exist_ok=True)
 
 	with strategy.scope():
-		model = model_framework.exploratory_model(
-			FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-5
-		)
+		if os.path.exists(model_path):
+			print(f"Loading existing model from {model_path}")
+			model = keras.models.load_model(model_path)
+
+			new_lr = 1e-6  # Lower learning rate.
+			optimizer = keras.optimizers.Adam(learning_rate=new_lr)
+			model.compile(optimizer=optimizer, 
+				 loss=keras.losses.SparseCategoricalCrossentropy(),
+				 metrics=['accuracy']) 
+		else:
+			print("No existing model found. Creating new model.")
+			model = model_framework.exploratory_model(
+				FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-5
+			)
 
 	model.summary()
 
