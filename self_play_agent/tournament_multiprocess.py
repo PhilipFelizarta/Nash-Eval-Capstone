@@ -48,6 +48,14 @@ def play_matchup(idx_a, idx_b, model_a, model_b, matchup_folder, M, temp):
 		"total": 0,
 	}
 
+	starting_fen = [
+		"rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", # Sicilian
+		"rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", # King's Pawn
+		"rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 1 2", # Indian Defense
+		"rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", # Queen's Pawn
+		"rnbqkbnr/pppp1ppp/8/4p3/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 0 2" # English
+	]
+
 	if idx_a == idx_b:
 		results["wins"] = M / 2
 		results["total"] = M
@@ -57,7 +65,7 @@ def play_matchup(idx_a, idx_b, model_a, model_b, matchup_folder, M, temp):
 
 	for i in range(M):
 		game_path = os.path.join(matchup_folder, f"game_{i}.pgn")
-		result = self_play_game_stochastic(model_a, model_b, game_path, temp=temp, max_moves=50)
+		result = self_play_game_stochastic(model_a, model_b, game_path, temp=temp, max_moves=100, starting_fen=starting_fen[i])
 
 		if result == "1-0":
 			results["wins"] += 1
@@ -133,7 +141,7 @@ def run_tournament(model_folder, N_players=8, M=5, temp=0.8, workers=4):
 
 
 if __name__ == "__main__":
-	model_folder = "models/RESNET_36p_4x512"
+	model_folder = "models/final_model"
 	N_players = int(os.getenv("N_PLAYERS"))
 	M = int(os.getenv("N_GAMES"))
 	temp = float(os.getenv("TEMP"))

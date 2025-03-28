@@ -125,7 +125,7 @@ def plot_nash_equilibria(df_nash, tournament_name):
 	print(f"Nash equilibrium plot saved to {output_path}")
 
 if __name__ == "__main__":
-	tournament_folder = "games/tournament_eda_model_10N"  # Example path
+	tournament_folder = "games/tournament_RESNET_P2_Depth1_WL"  # Example path
 	save_nash_results(tournament_folder)
 	winrate_matrix, df_nash, model_names = load_nash_results(tournament_folder)
 

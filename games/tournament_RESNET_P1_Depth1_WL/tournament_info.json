@@ -1,0 +1,19 @@
+{
+    "timestamp": "20250328_045304",
+    "num_models": 10,
+    "num_games_per_matchup": 5,
+    "temperature": 0.0,
+    "models": {
+        "0": "RESNET_36p_4x512_001.h5",
+        "1": "RESNET_36p_4x512_003.h5",
+        "2": "RESNET_36p_4x512_005.h5",
+        "3": "RESNET_36p_4x512_008.h5",
+        "4": "RESNET_36p_4x512_010.h5",
+        "5": "RESNET_36p_4x512_012.h5",
+        "6": "RESNET_36p_4x512_015.h5",
+        "7": "RESNET_36p_4x512_017.h5",
+        "8": "RESNET_36p_4x512_019.h5",
+        "9": "RESNET_36p_4x512_022.h5"
+    },
+    "results": []
+}
