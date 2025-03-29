@@ -1,0 +1,11 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "models/final_model/final_011.h5"]
+[Black "models/final_model/final_007.h5"]
+[Result "*"]
+[FEN "rnbqkbnr/pppp1ppp/8/4p3/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 0 2"]
+[SetUp "1"]
+
+2. Nf3 { WDL: 0.45/0.15/0.39 } 2... Ke7 { WDL: 0.42/0.20/0.38 } 3. Ng1 { WDL: 0.43/0.17/0.40 } 3... c5 { WDL: 0.46/0.18/0.36 } 4. f4 { WDL: 0.45/0.13/0.41 } 4... Ke6 { WDL: 0.46/0.17/0.37 } 5. g4 { WDL: 0.46/0.13/0.41 } 5... Qh4# { WDL: 1.00/0.00/0.00 } *

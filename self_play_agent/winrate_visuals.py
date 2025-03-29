@@ -36,8 +36,8 @@ def plot_winrate_matrix(winrate_matrix, model_names, tournament_name):
 	plt.close()
 
 if __name__ == "__main__":
-	tournament_folder = "games/tournament_RESNET_P2_Depth1_WL"  # Example path
-	winrate_matrix, model_names, tournament_name, = load_winrate_matrix(tournament_folder, 22)
+	tournament_folder = "games/tournament_final_model_WL"  # Example path
+	winrate_matrix, model_names, tournament_name, = load_winrate_matrix(tournament_folder, 0)
 
 	# Plot winrate matrix heatmap
 	plot_winrate_matrix(winrate_matrix, model_names, os.path.basename(tournament_folder))

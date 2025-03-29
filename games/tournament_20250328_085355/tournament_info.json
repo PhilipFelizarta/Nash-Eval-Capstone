@@ -1,0 +1,12 @@
+{
+    "timestamp": "20250328_085355",
+    "num_models": 3,
+    "num_games_per_matchup": 1,
+    "temperature": 0.0,
+    "models": {
+        "0": "final_001.h5",
+        "1": "final_024.h5",
+        "2": "final_048.h5"
+    },
+    "results": []
+}

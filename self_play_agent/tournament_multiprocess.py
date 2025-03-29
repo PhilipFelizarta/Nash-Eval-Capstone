@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Add core path for importing self_play_game_stochastic
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from core.self_play import self_play_game_stochastic
+from core.self_play import self_play_game_stochastic, self_play_game_depth2
 
 
 def find_models(model_folder, N_players=None):
@@ -65,7 +65,7 @@ def play_matchup(idx_a, idx_b, model_a, model_b, matchup_folder, M, temp):
 
 	for i in range(M):
 		game_path = os.path.join(matchup_folder, f"game_{i}.pgn")
-		result = self_play_game_stochastic(model_a, model_b, game_path, temp=temp, max_moves=100, starting_fen=starting_fen[i])
+		result = self_play_game_stochastic(model_a, model_b, game_path, max_moves=100, starting_fen=starting_fen[i], temp=temp)
 
 		if result == "1-0":
 			results["wins"] += 1

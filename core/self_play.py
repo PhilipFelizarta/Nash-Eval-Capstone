@@ -145,7 +145,7 @@ def select_depth2_move(board, model):
 	Returns:
 		tuple: (chess.Move, np.array) Selected move and its estimated WDL.
 	"""
-	def expected_score(p): return 0.5 * p[1] + 1.0 * p[2]
+	def expected_score(p): return 0.5 * p[1] + 1.0 * p[0]
 
 	legal_moves = list(board.legal_moves)
 	if not legal_moves:
@@ -161,7 +161,7 @@ def select_depth2_move(board, model):
 		# Check for immediate win
 		if board.is_checkmate():
 			board.pop()
-			return move, np.array([0.0, 0.0, 1.0])  # Immediate win
+			return move, np.array([1.0, 0.0, 0.0])  # Immediate win
 
 		opponent_moves = list(board.legal_moves)
 
@@ -173,7 +173,7 @@ def select_depth2_move(board, model):
 			else:
 				# Opponent is checkmated, this move is winning
 				board.pop()
-				return move, np.array([0.0, 0.0, 1.0])
+				return move, np.array([1.0, 0.0, 0.0])
 
 		for opp_move in opponent_moves:
 			board.push(opp_move)
@@ -255,7 +255,7 @@ def self_play_game_depth2(model_a_path, model_b_path, pgn_save_path, max_moves=1
 	resign_color = None
 	while not board.is_game_over():
 		current_model = model_a if board.turn == chess.WHITE else model_b
-		best_move, ldw = select_depth2_move(board, current_model)
+		best_move, wdl = select_depth2_move(board, current_model)
 
 		if best_move is None:
 			break  # No valid move, should not happen in normal play
@@ -264,7 +264,7 @@ def self_play_game_depth2(model_a_path, model_b_path, pgn_save_path, max_moves=1
 		node = node.add_variation(best_move)  # Store move in PGN
 
 		# Format WDL probabilities with 2 decimal places
-		l, d, w = map(lambda x: f"{x:.2f}", ldw)
+		w, d, l = map(lambda x: f"{x:.2f}", wdl)
 		node.comment = f"WDL: {w}/{d}/{l}"  # Save WDL evaluation
 
 		turn_count += 1
@@ -272,7 +272,7 @@ def self_play_game_depth2(model_a_path, model_b_path, pgn_save_path, max_moves=1
 		if turn_count > max_moves * 2:
 			break
 
-		if ldw[0] > 0.95: # 95% chance of loss resign.
+		if wdl[-1] > 0.95: # 95% chance of loss resign.
 			resign_color = board.turn # True.. black resigns
 			break
 

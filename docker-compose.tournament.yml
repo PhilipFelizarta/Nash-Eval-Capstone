@@ -25,9 +25,9 @@ services:
       - XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/x86_64-linux-gnu
       - TF_CPP_MIN_LOG_LEVEL=2 
       - TF_GPU_ALLOCATOR=cuda_malloc_async  
-      - N_PLAYERS=24
+      - N_PLAYERS=10
       - N_GAMES=5
       - TEMP=0.0
-      - WORKERS=4
+      - WORKERS=3
     command: ["python", "/app/script.py"] 
     working_dir: /app
