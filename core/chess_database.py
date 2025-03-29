@@ -84,7 +84,7 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 	Returns a TensorFlow Dataset streaming from a multi-threaded PGN generator.
 	"""
 	output_signature = (
-		tf.TensorSpec(shape=(None, 8, 8, 35), dtype=tf.float32),  # Input tensor batch
+		tf.TensorSpec(shape=(None, 8, 8, 36), dtype=tf.float32),  # Input tensor batch
 		tf.TensorSpec(shape=(None,), dtype=tf.int32),  # Sparse categorical labels
 		tf.TensorSpec(shape=(None,), dtype=tf.float32)  # Importance weights
 	)
@@ -134,3 +134,75 @@ def count_ply_and_games(zst_file, sample_count=1):
 				sys.stdout.flush()
 
 			return total_games, total_positions, sample_games
+		
+	
+def load_games_reversed(pgn_path):
+	"""Loads and returns a list of PGN game strings in reverse order."""
+	with open(pgn_path, "r", encoding="utf-8") as f:
+		text = f.read()
+
+	# Robust split: look for games starting with a header line `[Event`
+	raw_games = text.strip().split("\n[Event ")
+	games = [raw_games[0]] + [f"[Event {g}" for g in raw_games[1:]] if len(raw_games) > 1 else raw_games
+	games = [g.strip() for g in games if g.strip()]
+
+	print(f"🔎 Found {len(games)} games in PGN.")
+	return games[::-1]  # Reverse for bottom-up streaming
+
+def reversed_pgn_generator(pgn_file, batch_size=32, max_batches=100000):	
+	games = load_games_reversed(pgn_file)
+
+	game_data, labels, importance_weights = [], [], []
+	batch_count = 0
+
+	for g in games:
+		game = chess.pgn.read_game(io.StringIO(g))
+		if game is None:
+			continue
+
+		board = game.board()
+		game_result = extract_game_result(game.headers)
+		if game_result is None:
+			continue
+
+		ply_count = sum(1 for _ in game.mainline_moves())
+		current_ply = 0
+
+		for move in game.mainline_moves():
+			fen = board.fen()
+			turn = board.turn
+			relative_modifier = -1 if turn else 1
+			tensor = chess_env.fast_fen_to_example(fen)
+			importance = GAMMA ** (ply_count - current_ply)
+
+			game_data.append(tensor)
+			labels.append(int((game_result * relative_modifier) + 1))
+			importance_weights.append(importance)
+
+			board.push(move)
+			current_ply += 1
+
+			if len(game_data) >= batch_size:
+				yield np.array(game_data), np.array(labels), np.array(importance_weights)
+				game_data, labels, importance_weights = [], [], []
+				batch_count += 1
+				if batch_count >= max_batches:
+					return
+
+	# Yield any remaining data
+	if game_data and batch_count < max_batches:
+		yield np.array(game_data), np.array(labels), np.array(importance_weights)
+
+def get_tf_testset_from_end(pgn_file, batch_size=32, max_batches=100000):
+	output_signature = (
+		tf.TensorSpec(shape=(None, 8, 8, 36), dtype=tf.float32),
+		tf.TensorSpec(shape=(None,), dtype=tf.int32),
+		tf.TensorSpec(shape=(None,), dtype=tf.float32)
+	)
+
+	dataset = tf.data.Dataset.from_generator(
+		lambda: reversed_pgn_generator(pgn_file, batch_size, max_batches),
+		output_signature=output_signature
+	)
+
+	return dataset.prefetch(tf.data.AUTOTUNE)

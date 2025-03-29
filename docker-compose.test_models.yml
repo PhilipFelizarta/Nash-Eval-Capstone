@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  test_chess_models:
+    build:
+      context: .
+      dockerfile: Dockerfile.test_models  # Explicitly specify the Dockerfile
+    image: chess_test  # Name of the built image
+    container_name: test_models
+    runtime: nvidia  # Ensures GPU access
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all 
+              capabilities: [gpu]
+    volumes:
+      - ./models:/app/models
+      - ./figures:/app/figures
+      - ./games:/app/games
+      - ./archive_data:/app/archive_data
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all 
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/x86_64-linux-gnu
+      - TF_CPP_MIN_LOG_LEVEL=2 
+      - TF_GPU_ALLOCATOR=cuda_malloc_async  
+    command: ["python", "/app/script.py"] 
+    working_dir: /app

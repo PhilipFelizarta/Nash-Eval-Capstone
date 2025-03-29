@@ -1,0 +1,9 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "models/RESNET_4x512/RESNET_4x512_001.h5"]
+[Black "models/RESNET_4x512/RESNET_4x512_004.h5"]
+[Result "*"]
+
+1. d4 { WDL: 0.40/0.12/0.48 } 1... f5 { WDL: 0.51/0.06/0.43 } 2. e4 { WDL: 0.47/0.11/0.42 } 2... g5 { WDL: 0.50/0.05/0.44 } 3. Qh5# { WDL: 1.00/0.00/0.00 } *

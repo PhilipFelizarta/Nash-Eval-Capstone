@@ -1,0 +1,11 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "models/PART2_RESNET_36p_4x512/PART2_RESNET_36p_4x512_014.h5"]
+[Black "models/PART2_RESNET_36p_4x512/PART2_RESNET_36p_4x512_006.h5"]
+[Result "*"]
+[FEN "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"]
+[SetUp "1"]
+
+2. Ke2 { WDL: 0.58/0.05/0.37 } 2... f5 { WDL: 0.52/0.09/0.39 } 3. Kd3 { WDL: 0.58/0.06/0.36 } 3... Kf7 { WDL: 0.53/0.09/0.38 } 4. Ne2 { WDL: 0.59/0.05/0.36 } 4... e5 { WDL: 0.55/0.09/0.36 } 5. g4 { WDL: 0.62/0.05/0.33 } 5... b5 { WDL: 0.58/0.08/0.34 } 6. h4 { WDL: 0.64/0.04/0.32 } 6... Qxh4 { WDL: 0.59/0.08/0.34 } 7. gxf5 { WDL: 0.66/0.05/0.29 } 7... Qxh1 { WDL: 0.59/0.08/0.34 } 8. b4 { WDL: 0.61/0.05/0.33 } 8... Qf3# { WDL: 1.00/0.00/0.00 } *

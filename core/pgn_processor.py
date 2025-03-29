@@ -93,6 +93,7 @@ def compress_pgn(input_pgn_path, output_zst_path, compression_level=22):
 		f_out.write(compressed_data)
 
 
+
 if __name__ == "__main__":
 	#target_date = "2013-01"
 	#pgn_zst_to_json(f"data/lichess_db_standard_rated_{target_date}.pgn.zst", f"fen_data/{target_date}/", max_games=int(1e8))
