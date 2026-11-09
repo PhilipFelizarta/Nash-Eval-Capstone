@@ -21,7 +21,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, "cpp", "mcts"))
 
-from play.engine import Engine, Network  # noqa: E402
+from play.engine import Engine, load_network  # noqa: E402
 from self_play_agent.checkpoint_round_robin import pick_openings  # noqa: E402
 
 
@@ -43,7 +43,7 @@ def main():
 	sf_name = f"stockfish-{args.elo}" if args.elo else f"stockfish-{args.sf_nodes}n"
 	sf_limit = chess.engine.Limit(nodes=args.sf_nodes) if args.sf_nodes else chess.engine.Limit(time=args.seconds)
 
-	engine = Engine(Network(args.model))
+	engine = Engine(load_network(args.model))
 	sf = chess.engine.SimpleEngine.popen_uci(args.stockfish)
 	sf.configure({"Threads": 1, "Hash": 64, **({"UCI_LimitStrength": True, "UCI_Elo": args.elo} if args.elo else {})})
 	openings = pick_openings(args.openings, args.games // 2, seed=7)

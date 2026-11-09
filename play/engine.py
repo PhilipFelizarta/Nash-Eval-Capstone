@@ -75,6 +75,14 @@ class Network:
 		return policy.numpy(), value.numpy()
 
 
+def load_network(path, **kwargs):
+	"""Our Keras checkpoint (local or URL), or a Leela net converted to ONNX (see play/leela.py)."""
+	if path.endswith(".onnx"):
+		from play.leela import LeelaNetwork
+		return LeelaNetwork(path, **kwargs)
+	return Network(path, **kwargs)
+
+
 class Engine:
 	def __init__(self, network, batch_size=64, prior_temperature=0.1, workers=8, **mcts_kwargs):
 		self.net = network
@@ -95,6 +103,8 @@ class Engine:
 	def _evaluate(self, x, board):
 		if self.net.kind == "policy":
 			return self.net(x)
+		if self.net.kind == "leela":
+			return self.net.evaluate(board, self.tree.pending_paths())
 		return self._evaluate_legacy(board)
 
 	def _evaluate_legacy(self, root_board):
