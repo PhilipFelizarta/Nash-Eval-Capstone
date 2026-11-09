@@ -60,7 +60,11 @@ class TrainingPlotCallback(Callback):
 			print(f"Updated training plot saved at {self.plot_path}")
 
 
-def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3):
+def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3, policy_head=False, policy_weight=1.0):
+	"""
+	SE-ResNet value network. With policy_head=True it also outputs 4672 policy logits
+	(core/move_encoding.py) and trains on soft targets: {"policy": move distribution, "value": WDL}.
+	"""
 	inputs = keras.Input(shape=(8, 8, 36))
 
 	# **Input Convolution**
@@ -114,7 +118,28 @@ def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3
 	v = layers.Dropout(dropout)(v)  # Dropout before dense layer
 	v = layers.Dense(128, activation="relu")(v)
 	v = layers.Dropout(dropout)(v)  # Dropout after dense layer
-	outputs = layers.Dense(3, activation="softmax", dtype="float32")(v)  # VALUE_WDL format, float32 under mixed precision
+	outputs = layers.Dense(3, activation="softmax", dtype="float32", name="value")(v)  # VALUE_WDL format, float32 under mixed precision
+
+	if policy_head:
+		# **Policy Head**: one 73-plane move grid per from-square (AlphaZero layout)
+		p = layers.Conv2D(FILTERS, (3, 3), padding="same", activation=None)(x)
+		p = layers.BatchNormalization()(p)
+		p = layers.ReLU()(p)
+		p = layers.Conv2D(73, (1, 1), padding="same", activation=None)(p)
+		policy = layers.Flatten()(p)
+		policy = layers.Activation("linear", dtype="float32", name="policy")(policy)  # Logits; legal moves are masked at search time
+
+		model = keras.Model(inputs, {"policy": policy, "value": outputs})
+		model.compile(
+			optimizer=keras.optimizers.Adam(learning_rate=lr),
+			loss={
+				"policy": keras.losses.CategoricalCrossentropy(from_logits=True),
+				"value": keras.losses.CategoricalCrossentropy(),  # Soft WDL targets (e.g. Stockfish WDL)
+			},
+			loss_weights={"policy": policy_weight, "value": 1.0},
+			metrics={"policy": ["categorical_accuracy"], "value": ["categorical_accuracy"]},
+		)
+		return model
 
 	# **Build Model**
 	model = keras.Model(inputs, outputs)

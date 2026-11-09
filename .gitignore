@@ -6,3 +6,6 @@ fen_data/
 models/
 *__pycache__
 archive_data
+# nash_mcts C++ extension build output
+build/
+*.so
