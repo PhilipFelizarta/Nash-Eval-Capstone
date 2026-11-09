@@ -346,7 +346,7 @@ def main():
 	p.add_argument("--temp-plies", type=int, default=12)
 	p.add_argument("--max-plies", type=int, default=300)
 	p.add_argument("--resign", type=float, default=0.03)
-	p.add_argument("--max-backlog", type=int, default=20_000, help="pause actor games above this many unlabeled positions")
+	p.add_argument("--max-backlog", type=int, default=5_000, help="pause actor games above this many unlabeled positions")
 	p.add_argument("--shard-games", type=int, default=50, help="actor games per RUN/games file")
 	args = p.parse_args()
 

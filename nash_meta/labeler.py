@@ -108,7 +108,7 @@ class Shards:
 			return None
 		path = os.path.join(self.folder, f"shard_{self.next:06d}.npz")
 		buf = io.BytesIO()
-		np.savez(buf, fens=np.array(self.fens, dtype="S100"), idx=np.array(self.idx, np.int16),
+		np.savez_compressed(buf, fens=np.array(self.fens, dtype="S100"), idx=np.array(self.idx, np.int16),
 		         wdl=np.array(self.wdl, np.float32).reshape(-1, 3), subgame=np.array(self.subgame, np.int64),
 		         ply=np.array(self.ply, np.int16), roots=np.array(self.roots, dtype="S100"))
 		with open(path + ".tmp", "wb") as f:
