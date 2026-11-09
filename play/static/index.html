@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nash-Eval: play the network + C++ MCTS</title>
+<style>
+:root {
+	color-scheme: light;
+	--page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+	--grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+	--s1: #2a78d6; --s2: #eb6834;            /* visits, prior (validated pair) */
+	--sq-light: #ece8dc; --sq-dark: #9fae9a; --last: rgba(237,161,0,0.42); --sel: rgba(42,120,214,0.40);
+	--check: rgba(227,73,72,0.75); --white-side: #f4f3ee; --black-side: #2b2b29;
+}
+@media (prefers-color-scheme: dark) {
+	:root:where(:not([data-theme="light"])) {
+		color-scheme: dark;
+		--page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+		--grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+		--s1: #3987e5; --s2: #d95926;
+		--sq-light: #c9c4b4; --sq-dark: #74846f; --white-side: #e9e8e2; --black-side: #0f0f0e;
+	}
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { display: flex; gap: 20px; padding: 16px; flex-wrap: wrap; align-items: flex-start; max-width: 1280px; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
+h1 { font-size: 16px; margin: 0 0 2px; }
+h2 { font-size: 13px; margin: 0 0 8px; color: var(--ink2); font-weight: 600; }
+.sub { color: var(--ink2); font-size: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: .5; cursor: default; }
+
+/* board */
+.left { display: flex; flex-direction: column; gap: 10px; max-width: calc(min(560px, 88vw) + 30px); }
+.boardrow { display: flex; gap: 8px; }
+.evalbar { width: 22px; border-radius: 4px; overflow: hidden; position: relative; background: var(--black-side); border: 1px solid var(--ring); }
+.evalbar .w { position: absolute; left: 0; right: 0; background: var(--white-side); transition: height .25s; }
+.evalbar .mid { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--muted); }
+.board { position: relative; width: min(560px, 88vw); aspect-ratio: 1; border-radius: 6px; overflow: hidden; user-select: none; }
+.squares { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; }
+.sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.sq.l { background: var(--sq-light); } .sq.d { background: var(--sq-dark); }
+.sq.last::before, .sq.sel::before, .sq.chk::before { content: ""; position: absolute; inset: 0; }
+.sq.last::before { background: var(--last); }
+.sq.sel::before { background: var(--sel); }
+.sq.chk::before { background: radial-gradient(circle, var(--check) 0%, transparent 70%); }
+.sq .dot { position: absolute; width: 28%; height: 28%; border-radius: 50%; background: rgba(11,11,11,0.22); }
+.sq .ring { position: absolute; inset: 4%; border-radius: 50%; border: 5px solid rgba(11,11,11,0.22); }
+.pc { position: relative; font-size: calc(min(560px, 88vw) / 8 * 0.78); line-height: 1; font-family: "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols2", sans-serif; }
+.pc.w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 2px #000; }
+.pc.b { color: #111; text-shadow: 0 0 1px #fff8; }
+.coord { position: absolute; font-size: 10px; font-weight: 600; color: rgba(11,11,11,0.55); pointer-events: none; }
+.coord.f { right: 3px; bottom: 1px; } .coord.r { left: 3px; top: 1px; }
+svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.promo { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; gap: 8px; }
+.promo button { font-size: 40px; width: 70px; height: 70px; padding: 0; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.status { font-weight: 600; }
+.banner { background: rgba(237,161,0,0.16); border: 1px solid rgba(237,161,0,0.5); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+
+/* right panel */
+.right { flex: 1; min-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.tiles { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.2fr 0.6fr; gap: 12px; }
+.tile .v { font-size: 22px; font-weight: 650; }
+.tile.hero .v { font-size: 28px; }
+.tile .k { color: var(--ink2); font-size: 11px; }
+.progress { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.progress div { height: 100%; background: var(--muted); width: 0; }
+.evalline { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+.evalline .big { font-size: 26px; font-weight: 650; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--axis); color: var(--ink2); }
+
+table.policy { width: 100%; border-collapse: collapse; }
+table.policy td { padding: 3px 4px; vertical-align: middle; }
+table.policy tr.row:hover, table.policy tr.row.hl { background: var(--grid); }
+table.policy td.san { width: 64px; font-weight: 600; }
+table.policy td.n, table.policy td.q { width: 70px; text-align: right; color: var(--ink2); }
+.bars { position: relative; height: 18px; }
+.bars .b { position: absolute; left: 0; height: 7px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.bars .b.v { top: 1px; background: var(--s1); }
+.bars .b.p { top: 10px; background: var(--s2); }
+.bars .lab { position: absolute; top: 0; font-size: 11px; color: var(--ink2); white-space: nowrap; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 12px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.pv { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+svg.chart { width: 100%; height: 130px; display: block; }
+svg.chart text { fill: var(--muted); font-size: 10px; }
+.moves { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink2); max-height: 90px; overflow: auto; }
+#tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); box-shadow: 0 4px 14px rgba(0,0,0,.15); border-radius: 6px; padding: 6px 9px; font-size: 12px; display: none; z-index: 10; white-space: nowrap; }
+#tip b { font-weight: 650; }
+details summary { cursor: pointer; color: var(--ink2); font-size: 12px; }
+@media (max-width: 1000px) { .tiles { grid-template-columns: repeat(3, 1fr); } .charts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+	<div class="left">
+		<div>
+			<h1>You vs <span id="netname">…</span></h1>
+			<div class="sub" id="subtitle">C++ PUCT MCTS (nash_mcts) · network on the GPU</div>
+		</div>
+		<div id="banner" class="banner" style="display:none"></div>
+		<div class="boardrow">
+			<div class="evalbar" id="evalbar" title="Engine evaluation, White's expected score"><div class="w" id="evalw"></div><div class="mid"></div></div>
+			<div class="board" id="board">
+				<div class="squares" id="squares"></div>
+				<svg class="arrows" id="arrows" viewBox="0 0 8 8"></svg>
+				<div class="promo" id="promo"></div>
+			</div>
+		</div>
+		<div class="controls">
+			<span class="status" id="status">connecting…</span>
+		</div>
+		<div class="controls">
+			<button id="newWhite">New game as White</button>
+			<button id="newBlack">New game as Black</button>
+			<button id="flip">Flip board</button>
+		</div>
+		<div class="card"><h2>Moves</h2><div class="moves" id="moves">–</div></div>
+	</div>
+
+	<div class="right">
+		<div class="card">
+			<h2 id="searchTitle">Search</h2>
+			<div class="tiles">
+				<div class="tile hero"><div class="v num" id="tNps">–</div><div class="k">tree nodes / s</div></div>
+				<div class="tile"><div class="v num" id="tVisits">–</div><div class="k">simulations this move</div></div>
+				<div class="tile"><div class="v num" id="tNet">–</div><div class="k">network positions / s</div></div>
+				<div class="tile"><div class="v num" id="tTree">–</div><div class="k">nodes in tree</div></div>
+				<div class="tile"><div class="v num" id="tDepth">–</div><div class="k">max depth</div></div>
+			</div>
+			<div class="progress"><div id="prog"></div></div>
+			<div class="sub num" id="progText" style="margin-top:4px">&nbsp;</div>
+		</div>
+
+		<div class="card">
+			<h2>Evaluation</h2>
+			<div class="evalline">
+				<div><span class="big num" id="eWhite">–</span> <span class="sub">White's expected score</span></div>
+				<div><span class="num" id="eEngine">–</span> <span class="sub">for the engine (W + ½D at the root)</span></div>
+				<span class="badge" id="proven" style="display:none"></span>
+			</div>
+			<div class="pv" style="margin-top:8px"><span class="sub">Principal variation: </span><span id="pv">–</span></div>
+		</div>
+
+		<div class="card">
+			<h2 id="policyTitle">Tree policy</h2>
+			<div class="legend"><span><i style="background:var(--s1)"></i>visit share (tree policy)</span><span><i style="background:var(--s2)"></i>network prior</span><span>Q = engine's expected score after the move</span></div>
+			<table class="policy"><tbody id="policy"></tbody></table>
+			<details style="margin-top:6px"><summary>Table view</summary><pre class="pv" id="policyText" style="white-space:pre-wrap"></pre></details>
+		</div>
+
+		<div class="charts">
+			<div class="card"><h2>White's expected score after each engine move</h2><svg class="chart" id="cEval"></svg></div>
+			<div class="card"><h2>Tree nodes / s per engine move</h2><svg class="chart" id="cNps"></svg></div>
+		</div>
+	</div>
+</div>
+<div id="tip"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+let S = null, selected = null, flipped = false, hoverUci = null, promoChoices = null;
+
+// ---------- api ----------
+async function api(path, body) {
+	const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+	const j = await r.json().catch(() => ({}));
+	if (!r.ok) throw new Error(j.detail || r.statusText);
+	return j;
+}
+async function poll() {
+	try { S = await api("api/state"); render(); }
+	catch (e) { $("status").textContent = "connection lost: " + e.message; }
+	finally { setTimeout(poll, S && S.status === "thinking" ? 150 : 400); }
+}
+async function play(uci) {
+	selected = null; promoChoices = null;
+	try { S = await api("api/move", { uci }); } catch (e) { alert(e.message); }
+	render();
+}
+async function newGame(color) {
+	try { S = await api("api/new", { color }); selected = null; flipped = false; } catch (e) { alert(e.message); }
+	render();
+}
+$("newWhite").onclick = () => newGame("white");
+$("newBlack").onclick = () => newGame("black");
+$("flip").onclick = () => { flipped = !flipped; render(); };
+
+// ---------- helpers ----------
+const fmtInt = x => x == null ? "–" : Math.round(x).toLocaleString();
+const pct = x => x == null ? "–" : (100 * x).toFixed(1) + "%";
+const engineIsWhite = () => S.human === "black";
+const toWhite = v => v == null ? null : (engineIsWhite() ? v : 1 - v);
+const orient = () => (S.human === "black") !== flipped;   // true = black at the bottom
+
+function parseFen(fen) {
+	const b = {};
+	fen.split(" ")[0].split("/").forEach((row, i) => {
+		let f = 0;
+		for (const ch of row) {
+			if (/\d/.test(ch)) f += +ch;
+			else { b["abcdefgh"[f] + (8 - i)] = ch; f++; }
+		}
+	});
+	return b;
+}
+function xy(sq) {  // square -> display [col, row]
+	const f = sq.charCodeAt(0) - 97, r = +sq[1] - 1;
+	return orient() ? [7 - f, r] : [f, 7 - r];
+}
+function showTip(html, ev) {
+	const t = $("tip"); t.innerHTML = html; t.style.display = "block";
+	const x = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 8);
+	t.style.left = x + "px"; t.style.top = (ev.clientY + 14) + "px";
+}
+const hideTip = () => { $("tip").style.display = "none"; };
+
+// The snapshot to display: the live search while the engine thinks, otherwise the engine's last final search.
+function shownSearch() {
+	if (!S) return null;
+	if (S.status === "thinking") return S.search;
+	return S.last_engine;
+}
+
+// ---------- board ----------
+function onSquare(sq) {
+	if (!S || S.status !== "human") return;
+	const pieces = parseFen(S.fen);
+	const mine = p => p && ((p === p.toUpperCase()) === (S.turn === "white"));
+	if (selected) {
+		const cands = S.legal.filter(u => u.slice(0, 2) === selected && u.slice(2, 4) === sq);
+		if (cands.length === 1) return play(cands[0]);
+		if (cands.length > 1) { promoChoices = cands; return renderBoard(); }
+	}
+	selected = mine(pieces[sq]) && selected !== sq ? sq : null;
+	renderBoard();
+}
+
+function arrow(from, to, width, color, opacity, dashed) {
+	const [c0, r0] = xy(from), [c1, r1] = xy(to);
+	const x0 = c0 + .5, y0 = r0 + .5, x1 = c1 + .5, y1 = r1 + .5;
+	const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+	const head = Math.max(0.28, width * 2.2), hl = Math.min(0.42, len * 0.45);
+	const sx = x1 - ux * hl, sy = y1 - uy * hl, nx = -uy, ny = ux, w = width / 2;
+	const startX = x0 + ux * 0.18, startY = y0 + uy * 0.18;
+	if (dashed) {
+		return `<line x1="${startX}" y1="${startY}" x2="${sx}" y2="${sy}" stroke="${color}" stroke-width="${width}" stroke-dasharray="0.12 0.09" opacity="${opacity}"/>` +
+			`<polygon points="${x1},${y1} ${sx + nx * head / 2},${sy + ny * head / 2} ${sx - nx * head / 2},${sy - ny * head / 2}" fill="${color}" opacity="${opacity}"/>`;
+	}
+	const pts = [
+		[startX + nx * w, startY + ny * w], [sx + nx * w, sy + ny * w], [sx + nx * head / 2, sy + ny * head / 2],
+		[x1, y1], [sx - nx * head / 2, sy - ny * head / 2], [sx - nx * w, sy - ny * w], [startX - nx * w, startY - ny * w],
+	];
+	return `<polygon points="${pts.map(p => p.join(",")).join(" ")}" fill="${color}" opacity="${opacity}" stroke="var(--surface)" stroke-width="0.02"/>`;
+}
+
+function renderBoard() {
+	const pieces = parseFen(S.fen);
+	const targets = selected ? S.legal.filter(u => u.slice(0, 2) === selected).map(u => u.slice(2, 4)) : [];
+	const last = S.last_move ? [S.last_move.slice(0, 2), S.last_move.slice(2, 4)] : [];
+	let kingSq = null;
+	if (S.check) for (const [sq, p] of Object.entries(pieces)) if (p === (S.turn === "white" ? "K" : "k")) kingSq = sq;
+	let html = "";
+	for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
+		const f = orient() ? 7 - col : col, r = orient() ? row : 7 - row;
+		const sq = "abcdefgh"[f] + (r + 1), p = pieces[sq];
+		const cls = ["sq", (f + r) % 2 === 0 ? "d" : "l"];
+		if (last.includes(sq)) cls.push("last");
+		if (sq === selected) cls.push("sel");
+		if (sq === kingSq) cls.push("chk");
+		let inner = "";
+		if (p) inner += `<span class="pc ${p === p.toUpperCase() ? "w" : "b"}">${GLYPH[p.toLowerCase()]}︎</span>`;
+		if (targets.includes(sq)) inner += p ? `<span class="ring"></span>` : `<span class="dot"></span>`;
+		if (row === 7) inner += `<span class="coord f">${"abcdefgh"[f]}</span>`;
+		if (col === 0) inner += `<span class="coord r">${r + 1}</span>`;
+		html += `<div class="${cls.join(" ")}" data-sq="${sq}">${inner}</div>`;
+	}
+	$("squares").innerHTML = html;
+
+	// Arrows: the live tree policy while the engine thinks (width and opacity follow visit share),
+	// plus the next plies of the principal variation as dashed arrows.
+	let svg = "";
+	const s = S.status === "thinking" ? S.search : null;
+	if (s && s.moves && s.moves.length) {
+		const top = s.moves.filter(m => m.share >= 0.02 || m.uci === hoverUci).slice(0, 6);
+		(s.pv || []).slice(1, 4).forEach((u, i) => { svg += arrow(u.slice(0, 2), u.slice(2, 4), 0.06, "var(--muted)", 0.85 - i * 0.2, true); });
+		for (const m of [...top].reverse()) {
+			const hl = m.uci === hoverUci;
+			svg += arrow(m.uci.slice(0, 2), m.uci.slice(2, 4), 0.07 + 0.22 * m.share, "var(--s1)", hl ? 0.95 : 0.35 + 0.6 * m.share, false);
+		}
+	}
+	$("arrows").innerHTML = svg;
+
+	const promo = $("promo");
+	if (promoChoices) {
+		const white = S.turn === "white";
+		promo.innerHTML = promoChoices.map(u => `<button data-uci="${u}"><span class="pc ${white ? "w" : "b"}" style="font-size:44px">${GLYPH[u[4]]}︎</span></button>`).join("") +
+			`<button data-uci="" style="font-size:16px">cancel</button>`;
+		promo.style.display = "flex";
+	} else promo.style.display = "none";
+}
+$("squares").addEventListener("click", e => { const el = e.target.closest(".sq"); if (el) onSquare(el.dataset.sq); });
+$("promo").addEventListener("click", e => {
+	const b = e.target.closest("button"); if (!b) return;
+	if (b.dataset.uci) play(b.dataset.uci); else { promoChoices = null; selected = null; renderBoard(); }
+});
+
+// ---------- panels ----------
+function renderSearch() {
+	const s = shownSearch();
+	const live = S.status === "thinking";
+	$("searchTitle").textContent = live ? "Search (live)" : s ? `Search for the engine's last move (${s.played})` : "Search";
+	$("tNps").textContent = s ? fmtInt(s.nodes_per_second) : "–";
+	$("tVisits").textContent = s ? fmtInt(s.new_visits) : "–";
+	$("tNet").textContent = s ? fmtInt(s.net_positions_per_second) : "–";
+	$("tTree").textContent = s ? fmtInt(s.tree_nodes) : "–";
+	$("tDepth").textContent = s ? s.max_depth : "–";
+	const el = s ? s.elapsed : 0;
+	$("prog").style.width = Math.min(100, 100 * el / S.seconds) + "%";
+	$("progText").textContent = s ? `${el.toFixed(2)} s of ${S.seconds} s · root visits incl. reused subtree: ${fmtInt(s.root_visits)}` : " ";
+
+	const v = s ? s.root_value : null;
+	$("eWhite").textContent = pct(toWhite(v));
+	$("eEngine").textContent = pct(v);
+	$("evalw").style.height = (v == null ? 50 : 100 * toWhite(v)) + "%";
+	$("evalw").style[orient() ? "top" : "bottom"] = "0";
+	$("evalw").style[orient() ? "bottom" : "top"] = "auto";
+	const pr = $("proven");
+	if (s && s.proven && s.proven !== "unknown") { pr.style.display = ""; pr.textContent = `proven ${s.proven} for the engine`; }
+	else pr.style.display = "none";
+	$("pv").textContent = s && s.pv_san && s.pv_san.length ? s.pv_san.join(" ") : "–";
+
+	$("policyTitle").textContent = live ? "Tree policy (live)" : s ? `Final tree policy before ${s.played}` : "Tree policy";
+	const moves = s ? s.moves : [];
+	const maxV = Math.max(0.0001, ...moves.map(m => Math.max(m.share, m.prior)));
+	$("policy").innerHTML = moves.map(m => {
+		const wv = 100 * m.share / maxV, wp = 100 * m.prior / maxV, played = !live && s.played === m.san;
+		return `<tr class="row${m.uci === hoverUci ? " hl" : ""}" data-uci="${m.uci}">
+			<td class="san">${m.san}${played ? " ✓" : ""}</td>
+			<td><div class="bars"><div class="b v" style="width:${wv * 0.82}%"></div><div class="b p" style="width:${wp * 0.82}%"></div>
+				<span class="lab num" style="left:calc(${Math.max(wv, wp) * 0.82}% + 6px)">${pct(m.share)}</span></div></td>
+			<td class="n num">${fmtInt(m.visits)}</td>
+			<td class="q num">${m.q == null ? "–" : pct(m.q)}</td></tr>`;
+	}).join("") || `<tr><td class="sub">No search yet. Make a move.</td></tr>`;
+	$("policyText").textContent = moves.length
+		? ["move     visits   share   prior       Q", ...moves.map(m => `${m.san.padEnd(7)}${String(m.visits).padStart(8)}${pct(m.share).padStart(8)}${pct(m.prior).padStart(8)}${(m.q == null ? "–" : pct(m.q)).padStart(8)}`)].join("\n")
+		: "";
+}
+$("policy").addEventListener("mousemove", e => {
+	const tr = e.target.closest("tr.row"); const s = shownSearch();
+	if (!tr || !s) return hideTip();
+	const m = s.moves.find(x => x.uci === tr.dataset.uci); if (!m) return;
+	if (hoverUci !== m.uci) { hoverUci = m.uci; renderBoard(); }
+	showTip(`<b>${m.san}</b> (${m.uci})<br>visits ${fmtInt(m.visits)} · share ${pct(m.share)}<br>prior ${pct(m.prior)}<br>Q ${m.q == null ? "unvisited" : pct(m.q) + " for the engine"}`, e);
+});
+$("policy").addEventListener("mouseleave", () => { hoverUci = null; hideTip(); renderBoard(); });
+
+function lineChart(svgEl, pts, opts) {
+	const W = svgEl.clientWidth || 300, H = 130, L = 34, R = 8, T = 8, B = 20;
+	const P = opts.bars ? 12 : 6;  // keep end marks inside the plot
+	const xs = i => L + P + (pts.length <= 1 ? (W - L - R - 2 * P) / 2 : i * (W - L - R - 2 * P) / (pts.length - 1));
+	const ys = v => T + (1 - (v - opts.min) / (opts.max - opts.min)) * (H - T - B);
+	let g = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+	for (const t of opts.ticks) g += `<line x1="${L}" x2="${W - R}" y1="${ys(t)}" y2="${ys(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 4}" y="${ys(t) + 3}" text-anchor="end">${opts.fmt(t)}</text>`;
+	g += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--axis)"/>`;
+	if (!pts.length) g += `<text x="${(W + L) / 2}" y="${H / 2}" text-anchor="middle">no engine moves yet</text>`;
+	if (opts.bars) {
+		const bw = Math.max(2, Math.min(18, (W - L - R) / Math.max(pts.length, 1) - 2));
+		pts.forEach((p, i) => { const y = ys(p.v); g += `<rect x="${xs(i) - bw / 2}" y="${y}" width="${bw}" height="${Math.max(0, H - B - y)}" rx="2" fill="var(--s1)"/>`; });
+	} else if (pts.length) {
+		g += `<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${pts.map((p, i) => `${xs(i)},${ys(p.v)}`).join(" ")}"/>`;
+		pts.forEach((p, i) => { g += `<circle cx="${xs(i)}" cy="${ys(p.v)}" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`; });
+	}
+	pts.forEach((p, i) => {
+		const w = pts.length <= 1 ? W - L - R : (W - L - R - 2 * P) / (pts.length - 1);
+		const x0 = pts.length <= 1 ? L : xs(i) - w / 2;
+		g += `<rect class="hit" data-i="${i}" x="${x0}" y="${T}" width="${w}" height="${H - T - B}" fill="transparent"/>`;
+	});
+	if (pts.length) {
+		g += `<text x="${L}" y="${H - 6}" text-anchor="start">${pts[0].label}</text>`;
+		if (pts.length > 1) g += `<text x="${W - R}" y="${H - 6}" text-anchor="end">${pts[pts.length - 1].label}</text>`;
+	}
+	svgEl.outerHTML = g.replace("<svg ", `<svg class="chart" id="${svgEl.id}" `) + "</svg>";
+	const fresh = $(svgEl.id);
+	fresh.addEventListener("mousemove", e => {
+		const r = e.target.closest("rect.hit"); if (!r) return hideTip();
+		showTip(opts.tip(pts[+r.dataset.i]), e);
+	});
+	fresh.addEventListener("mouseleave", hideTip);
+}
+
+let chartKey = "";
+function renderCharts() {
+	const key = JSON.stringify([S.history.length, S.human, document.body.clientWidth]);
+	if (key === chartKey) return;
+	chartKey = key;
+	const label = h => `${Math.floor(h.ply / 2) + 1}${h.ply % 2 ? "…" : "."} ${h.played}`;
+	lineChart($("cEval"), S.history.map(h => ({ v: toWhite(h.value), label: label(h), h })), {
+		min: 0, max: 1, ticks: [0, 0.5, 1], fmt: t => (100 * t) + "%",
+		tip: p => `<b>${p.label}</b><br>White's expected score ${pct(p.v)}<br>(engine: ${pct(p.h.value)})`,
+	});
+	const maxN = Math.max(1, ...S.history.map(h => h.nps));
+	const step = Math.pow(10, Math.floor(Math.log10(maxN))), top = Math.ceil(maxN / step) * step;
+	lineChart($("cNps"), S.history.map(h => ({ v: h.nps, label: label(h), h })), {
+		min: 0, max: top, ticks: [0, top / 2, top], bars: true, fmt: t => t >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + "k" : t,
+		tip: p => `<b>${p.label}</b><br>${fmtInt(p.v)} nodes/s<br>${fmtInt(p.h.visits)} simulations`,
+	});
+}
+
+function render() {
+	if (!S) return;
+	$("netname").textContent = S.network;
+	const placeholder = /placeholder/.test(S.network);
+	$("banner").style.display = placeholder ? "" : "none";
+	$("banner").textContent = placeholder ? "This is an untrained placeholder network: the search speed is real, the play is not. Load a trained checkpoint with --model to play the real thing." : "";
+	$("subtitle").textContent = `C++ PUCT MCTS (nash_mcts) · ${S.seconds} s per move · you play ${S.human}`;
+	const s = S.search;
+	$("status").textContent =
+		S.status === "over" ? `Game over: ${S.result}` :
+		S.status === "thinking" ? `Engine thinking… ${s ? s.elapsed.toFixed(1) : "0.0"} / ${S.seconds} s` :
+		S.check ? "Your move (check)" : "Your move";
+	$("newWhite").disabled = $("newBlack").disabled = S.status === "thinking";
+	$("moves").textContent = S.moves_text || "–";
+	renderBoard();
+	renderSearch();
+	renderCharts();
+}
+window.addEventListener("resize", () => { chartKey = ""; if (S) renderCharts(); });
+poll();
+</script>
+</body>
+</html>

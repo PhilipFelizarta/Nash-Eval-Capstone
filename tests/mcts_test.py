@@ -427,3 +427,22 @@ def test_play_game_mcts_writes_pgn(tmp_path):
 										  starting_fen="6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1", add_noise=False)
 	assert result == "1-0" and [r["move"] for r in records] == ["a1a8"]
 	assert '[Result "1-0"]' in path.read_text()
+
+
+def test_principal_variation_and_depth():
+	tree = nash_mcts.MCTS(dirichlet_epsilon=0.0, seed=0)
+	tree.reset(chess.STARTING_FEN, [], False)
+	assert tree.principal_variation() == [] and tree.max_depth() == 0
+	while tree.root_visits() < 400:
+		x = tree.gather(16)
+		tree.backup(np.zeros((len(x), nash_mcts.POLICY_SIZE), np.float32), np.tile(np.float32([0, 1, 0]), (len(x), 1)))
+	pv = tree.principal_variation(8)
+	assert 1 <= len(pv) <= 8 and tree.max_depth() >= len(pv) - 1
+	board = chess.Board()
+	for uci in pv:
+		move = chess.Move.from_uci(uci)
+		assert move in board.legal_moves
+		board.push(move)
+	assert pv[0] == tree.select_move(0.0)
+	tree.advance(pv[0])  # reused subtree keeps parent-before-child order
+	assert tree.principal_variation(7) == pv[1:8] and tree.max_depth() >= 0

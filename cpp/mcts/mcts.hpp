@@ -354,6 +354,39 @@ class MCTS {
         return s;
     }
 
+    // Most-visited line from the root (stops at unexpanded nodes or after max_len plies).
+    std::vector<std::string> principal_variation(int max_len = 16) const {
+        std::vector<std::string> out;
+        int x = 0;
+        while (static_cast<int>(out.size()) < max_len && nodes_[x].state == EXPANDED) {
+            const Node& p = nodes_[x];
+            int best = -1;  // same rule as select_move(0): most visits, ties broken by prior
+            for (int j = 0; j < p.num_children; ++j) {
+                const Node& c = nodes_[p.first_child + j];
+                if (c.n == 0) continue;
+                if (best < 0 || c.n > nodes_[best].n || (c.n == nodes_[best].n && c.prior > nodes_[best].prior))
+                    best = p.first_child + j;
+            }
+            if (best < 0) break;
+            out.push_back(move_uci(chess::Move(nodes_[best].move)));
+            x = best;
+        }
+        return out;
+    }
+
+    // Deepest visited ply in the tree.
+    int max_depth() const {
+        std::vector<int> depth(nodes_.size(), 0);
+        int best = 0;
+        for (size_t i = 1; i < nodes_.size(); ++i) {
+            const Node& nd = nodes_[i];
+            if (nd.parent < 0) continue;
+            depth[i] = depth[nd.parent] + 1;  // children are always created after their parent
+            if (nd.n > 0) best = std::max(best, depth[i]);
+        }
+        return best;
+    }
+
     size_t num_nodes() const { return nodes_.size(); }
     const GatherStats& last_gather() const { return stats_; }
     std::string root_fen() const { return board_.getFen(true); }

@@ -145,6 +145,9 @@ PYBIND11_MODULE(nash_mcts, m) {
         .def("num_pending", &nash::MCTS::num_pending)
         .def("total_virtual_loss", &nash::MCTS::total_virtual_loss)
         .def("num_nodes", &nash::MCTS::num_nodes)
+        .def("principal_variation", &nash::MCTS::principal_variation, py::arg("max_len") = 16,
+             "Most-visited line from the root, as UCI moves.")
+        .def("max_depth", &nash::MCTS::max_depth, "Deepest visited ply in the tree.")
         .def("last_gather_stats",
              [](const nash::MCTS& t) {
                  const auto& s = t.last_gather();
