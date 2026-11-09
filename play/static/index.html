@@ -175,14 +175,65 @@ async function api(path, body) {
 	if (!r.ok) throw new Error(j.detail || r.statusText);
 	return j;
 }
+// State is pushed over one websocket (no request per update); polling is the fallback.
+let pendingFen = null;  // fen shown optimistically after the human's move, until the server confirms it
+function accept(state) {
+	if (pendingFen && state.status === "human") return;  // stale pre-move state still in flight
+	S = state; render();
+}
+let polling = false;
+function connect() {
+	let ws;
+	try { ws = new WebSocket(location.href.replace(/^http/, "ws").replace(/[^/]*$/, "") + "api/ws"); }
+	catch (e) { return startPolling(); }
+	let opened = false;
+	ws.onopen = () => { opened = true; };
+	ws.onmessage = e => accept(JSON.parse(e.data));
+	ws.onclose = () => {
+		if (!opened) return startPolling();
+		$("status").textContent = "reconnecting…";
+		setTimeout(connect, 1000);
+	};
+}
+function startPolling() { if (!polling) { polling = true; poll(); } }
 async function poll() {
-	try { S = await api("api/state"); render(); }
+	try { accept(await api("api/state")); }
 	catch (e) { $("status").textContent = "connection lost: " + e.message; }
 	finally { setTimeout(poll, S && S.status === "thinking" ? 150 : 400); }
 }
+// Show the human's move at once (the server round trip goes through two tunnels), then confirm.
+function applyLocal(fen, uci) {
+	const b = parseFen(fen), from = uci.slice(0, 2), to = uci.slice(2, 4);
+	let p = b[from]; delete b[from];
+	const lower = p.toLowerCase(), df = to.charCodeAt(0) - from.charCodeAt(0);
+	if (lower === "k" && Math.abs(df) === 2) {  // castling: move the rook too
+		const rank = from[1], rf = df > 0 ? "h" : "a", rt = df > 0 ? "f" : "d";
+		b[rt + rank] = b[rf + rank]; delete b[rf + rank];
+	}
+	if (lower === "p" && df !== 0 && !b[to]) delete b[to[0] + from[1]];  // en passant
+	if (uci.length === 5) p = p === p.toUpperCase() ? uci[4].toUpperCase() : uci[4];
+	b[to] = p;
+	let rows = [];
+	for (let r = 8; r >= 1; r--) {
+		let row = "", empty = 0;
+		for (const f of "abcdefgh") {
+			const q = b[f + r];
+			if (q) { if (empty) row += empty; empty = 0; row += q; } else empty++;
+		}
+		rows.push(row + (empty || ""));
+	}
+	const parts = fen.split(" ");
+	parts[0] = rows.join("/"); parts[1] = parts[1] === "w" ? "b" : "w";
+	return parts.join(" ");
+}
 async function play(uci) {
 	selected = null; promoChoices = null;
-	try { S = await api("api/move", { uci }); } catch (e) { alert(e.message); }
+	const before = S;
+	pendingFen = applyLocal(S.fen, uci);
+	S = { ...S, fen: pendingFen, status: "thinking", search: null, legal: [], check: false, last_move: uci, turn: S.turn === "white" ? "black" : "white" };
+	render();
+	try { S = await api("api/move", { uci }); pendingFen = null; }
+	catch (e) { S = before; pendingFen = null; alert(e.message); }
 	render();
 }
 async function newGame(color) {
@@ -215,6 +266,8 @@ function xy(sq) {  // square -> display [col, row]
 	const f = sq.charCodeAt(0) - 97, r = +sq[1] - 1;
 	return orient() ? [7 - f, r] : [f, 7 - r];
 }
+// Only touch the DOM when the markup changed, so elements under the pointer survive between updates.
+function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
 function showTip(html, ev) {
 	const t = $("tip"); t.innerHTML = html; t.style.display = "block";
 	const x = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 8);
@@ -282,7 +335,7 @@ function renderBoard() {
 		if (col === 0) inner += `<span class="coord r">${r + 1}</span>`;
 		html += `<div class="${cls.join(" ")}" data-sq="${sq}">${inner}</div>`;
 	}
-	$("squares").innerHTML = html;
+	setHTML($("squares"), html);
 
 	// Arrows: the live tree policy while the engine thinks (width and opacity follow visit share),
 	// plus the next plies of the principal variation as dashed arrows.
@@ -296,17 +349,17 @@ function renderBoard() {
 			svg += arrow(m.uci.slice(0, 2), m.uci.slice(2, 4), 0.07 + 0.22 * m.share, "var(--s1)", hl ? 0.95 : 0.35 + 0.6 * m.share, false);
 		}
 	}
-	$("arrows").innerHTML = svg;
+	setHTML($("arrows"), svg);
 
 	const promo = $("promo");
 	if (promoChoices) {
 		const white = S.turn === "white";
-		promo.innerHTML = promoChoices.map(u => `<button data-uci="${u}"><span class="pc ${white ? "w" : "b"}" style="font-size:44px">${GLYPH[u[4]]}︎</span></button>`).join("") +
-			`<button data-uci="" style="font-size:16px">cancel</button>`;
+		setHTML(promo, promoChoices.map(u => `<button data-uci="${u}"><span class="pc ${white ? "w" : "b"}" style="font-size:44px">${GLYPH[u[4]]}︎</span></button>`).join("") +
+			`<button data-uci="" style="font-size:16px">cancel</button>`);
 		promo.style.display = "flex";
 	} else promo.style.display = "none";
 }
-$("squares").addEventListener("click", e => { const el = e.target.closest(".sq"); if (el) onSquare(el.dataset.sq); });
+$("squares").addEventListener("pointerdown", e => { const el = e.target.closest(".sq"); if (el) onSquare(el.dataset.sq); });
 $("promo").addEventListener("click", e => {
 	const b = e.target.closest("button"); if (!b) return;
 	if (b.dataset.uci) play(b.dataset.uci); else { promoChoices = null; selected = null; renderBoard(); }
@@ -340,7 +393,7 @@ function renderSearch() {
 	$("policyTitle").textContent = live ? "Tree policy (live)" : s ? `Final tree policy before ${s.played}` : "Tree policy";
 	const moves = s ? s.moves : [];
 	const maxV = Math.max(0.0001, ...moves.map(m => Math.max(m.share, m.prior)));
-	$("policy").innerHTML = moves.map(m => {
+	setHTML($("policy"), moves.map(m => {
 		const wv = 100 * m.share / maxV, wp = 100 * m.prior / maxV, played = !live && s.played === m.san;
 		return `<tr class="row${m.uci === hoverUci ? " hl" : ""}" data-uci="${m.uci}">
 			<td class="san">${m.san}${played ? " ✓" : ""}</td>
@@ -348,7 +401,7 @@ function renderSearch() {
 				<span class="lab num" style="left:calc(${Math.max(wv, wp) * 0.82}% + 6px)">${pct(m.share)}</span></div></td>
 			<td class="n num">${fmtInt(m.visits)}</td>
 			<td class="q num">${m.q == null ? "–" : pct(m.q)}</td></tr>`;
-	}).join("") || `<tr><td class="sub">No search yet. Make a move.</td></tr>`;
+	}).join("") || `<tr><td class="sub">No search yet. Make a move.</td></tr>`);
 	$("policyText").textContent = moves.length
 		? ["move     visits   share   prior       Q", ...moves.map(m => `${m.san.padEnd(7)}${String(m.visits).padStart(8)}${pct(m.share).padStart(8)}${pct(m.prior).padStart(8)}${(m.q == null ? "–" : pct(m.q)).padStart(8)}`)].join("\n")
 		: "";
@@ -433,7 +486,7 @@ function render() {
 	renderCharts();
 }
 window.addEventListener("resize", () => { chartKey = ""; if (S) renderCharts(); });
-poll();
+connect();
 </script>
 </body>
 </html>

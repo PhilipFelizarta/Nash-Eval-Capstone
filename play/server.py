@@ -8,12 +8,14 @@ Play against the network + C++ MCTS in the browser.
 Then open http://127.0.0.1:8765. The engine thinks --seconds per move (default 5).
 """
 import argparse
+import asyncio
+import json
 import os
 import threading
 
 import chess
 import chess.pgn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
@@ -136,6 +138,22 @@ def main():
 	@app.get("/api/state")
 	def state():
 		return game.state()
+
+	@app.websocket("/api/ws")
+	async def ws(socket: WebSocket):
+		"""Pushes the state whenever it changes (about 8 per second while the engine thinks).
+		A websocket rather than server-sent events: Cloudflare quick tunnels buffer SSE."""
+		await socket.accept()
+		last = None
+		try:
+			while True:
+				data = json.dumps(game.state())
+				if data != last:
+					last = data
+					await socket.send_text(data)
+				await asyncio.sleep(0.12)
+		except (WebSocketDisconnect, RuntimeError):
+			pass
 
 	@app.post("/api/move")
 	def move(body: MoveIn):
