@@ -14,7 +14,8 @@ memory; the main process merges every pending slot into one XLA call that runs a
 the policy/value back into each slot's shared buffers and wakes the workers.
 
 Writes `winrate_matrix.npz` in the project's format (winrate_matrix[a, b] = a's score with White
-against b), all games as PGN, and `progress.json` (live; read by play/server.py --tournament-progress).
+against b), all games as PGN, and two live files read by play/server.py: `progress.json` (--tournament-progress)
+and `games.json` (every game's moves and evals, next to it; the /games viewer).
 """
 import argparse
 import glob
@@ -167,26 +168,31 @@ class Slot:
 		return counts
 
 	def backup_and_move(self):
-		"""Backs up the evaluations, plays every finished search; returns (plies played, finished games)."""
+		"""Backs up the evaluations, plays every finished search.
+
+		Returns (moves played as (game id, uci, White's expected score from the mover's search), finished games).
+		"""
 		row, gathered = 0, set()
 		for g, x in self.items:
 			k = len(x)
 			g.tree().backup(self.policy[row:row + k], self.value[row:row + k])
 			row += k
 			gathered.add(id(g))
-		plies, done, still = 0, [], []
+		moved, done, still = [], [], []
 		for g in self.active:
 			# A tree that found nothing to evaluate three steps running (everything terminal or proven) moves now.
 			g.idle = 0 if id(g) in gathered else g.idle + 1
 			if g.search_done() or g.idle >= 3:
+				white_moved = g.board.turn == chess.WHITE
 				g.play()
-				plies += 1
+				v = float(g.values[-1])
+				moved.append((g.id, g.board.move_stack[-1].uci(), v if white_moved else 1 - v))
 			if g.result is None:
 				still.append(g)
 			else:
 				done.append((g.id, g.players, g.opening, [m.uci() for m in g.board.move_stack], g.result))
 		self.active = still
-		return plies, done
+		return moved, done
 
 
 def worker(conn, specs, args, slot_names, rows, n_models, policy_shape, value_shape):
@@ -200,17 +206,17 @@ def worker(conn, specs, args, slot_names, rows, n_models, policy_shape, value_sh
 
 	for i, slot in enumerate(slots):
 		refill(slot)
-		conn.send(("eval", i, slot.gather(args.leaves), 0, []))
+		conn.send(("eval", i, slot.gather(args.leaves), [], []))
 	live = len(slots)
 	while live:
 		_, i = conn.recv()
 		slot = slots[i]
-		plies, done = slot.backup_and_move()
+		moved, done = slot.backup_and_move()
 		refill(slot)
 		if slot.active:
-			conn.send(("eval", i, slot.gather(args.leaves), plies, done))
+			conn.send(("eval", i, slot.gather(args.leaves), moved, done))
 		else:
-			conn.send(("bye", i, None, plies, done))
+			conn.send(("bye", i, None, moved, done))
 			live -= 1
 	for slot in slots:
 		for shm in slot.shm:
@@ -307,10 +313,24 @@ def main():
 			json.dump(state, f)
 		os.replace(tmp, os.path.join(args.out, "progress.json"))
 
+	# Every game that has made a move, for the game viewer (play/server.py /games): moves and, per ply, White's
+	# expected score according to the side that just searched.
+	trace, results = {}, {}
+
+	def write_games():
+		out = [{"id": gid, "white": names[schedule[gid][0]], "black": names[schedule[gid][1]], "opening": schedule[gid][2],
+		        "moves": moves, "scores": scores, "result": results.get(gid)}
+		       for gid, (moves, scores) in sorted(trace.items())]
+		tmp = os.path.join(args.out, "games.json.tmp")
+		with open(tmp, "w") as f:
+			json.dump(out, f, separators=(",", ":"))
+		os.replace(tmp, os.path.join(args.out, "games.json"))
+
 	def record(done):
 		nonlocal finished
 		with open(pgn_path, "a") as f:
 			for gid, (a, b), opening, moves, result in done:
+				results[gid] = result
 				score[a, b] += {"1-0": 1.0, "0-1": 0.0, "1/2-1/2": 0.5}[result]
 				games[a, b] += 1
 				wdl_counts[result] += 1
@@ -365,8 +385,12 @@ def main():
 			timeout = None if not pending else max(0.0, first + 0.01 - time.time())
 			for c in connection.wait(open_conns, timeout):
 				while c in open_conns and c.poll():
-					kind, i, counts, ply_count, done = c.recv()
-					plies += ply_count
+					kind, i, counts, moved, done = c.recv()
+					plies += len(moved)
+					for gid, uci, white_score in moved:
+						trace.setdefault(gid, ([], []))
+						trace[gid][0].append(uci)
+						trace[gid][1].append(round(white_score, 4))
 					record(done)
 					if kind == "eval":
 						pending.append((owner[id(c)], i, counts))
@@ -383,11 +407,13 @@ def main():
 			if time.time() - last_write > 2:
 				now = time.time()
 				write_progress()
+				write_games()
 				d_evals, d_steps, d_gpu = evals - last[0], steps - last[1], gpu_time - last[2]
 				print(f"{finished}/{len(schedule)} games, {plies} plies, {d_evals / (now - last_write):,.0f} evals/s, "
 				      f"gpu {d_gpu / (now - last_write):.0%}, {d_evals / max(d_steps, 1):,.0f} evals/call", flush=True)
 				last_write, last = now, (evals, steps, gpu_time)
 		write_progress(final=True)
+		write_games()
 	finally:
 		for p in procs:
 			p.join(timeout=5)

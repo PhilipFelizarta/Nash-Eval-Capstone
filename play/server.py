@@ -162,6 +162,49 @@ def main():
 	def tournament_state():
 		return progress(args.tournament_progress, 60)
 
+	# Tournament game viewer: games.json is written next to progress.json by checkpoint_round_robin.py.
+	games_cache = {"mtime": None, "games": []}
+
+	def tournament_games():
+		path = args.tournament_progress and os.path.join(os.path.dirname(args.tournament_progress), "games.json")
+		if not path or not os.path.exists(path):
+			return []
+		mtime = os.path.getmtime(path)
+		if mtime != games_cache["mtime"]:
+			with open(path) as f:
+				games_cache["games"] = {g["id"]: g for g in json.load(f)}
+			games_cache["mtime"] = mtime
+		return games_cache["games"]
+
+	@app.get("/games")
+	def games_page():
+		return FileResponse(os.path.join(HERE, "static", "games.html"))
+
+	@app.get("/api/games")
+	def games_list():
+		return [{"id": g["id"], "white": g["white"], "black": g["black"], "result": g["result"], "plies": len(g["moves"]),
+		         "score": g["scores"][-1] if g["scores"] else None} for g in tournament_games().values()]
+
+	@app.get("/api/games/{gid}")
+	def game_detail(gid: int):
+		g = tournament_games().get(gid)
+		if g is None:
+			raise HTTPException(404, "no such game")
+		board = chess.Board(g["opening"])
+		fens, sans = [board.fen()], []
+		for uci in g["moves"]:
+			move = chess.Move.from_uci(uci)
+			sans.append(board.san(move))
+			board.push(move)
+			fens.append(board.fen())
+		ending = None
+		if g["result"]:
+			outcome = board.outcome(claim_draw=True)
+			ending = outcome.termination.name.replace("_", " ").lower() if outcome else \
+				("move limit" if g["result"] == "1/2-1/2" else "resignation")
+		return {**g, "fens": fens, "sans": sans, "ending": ending,
+		        "first_white": chess.Board(g["opening"]).turn}
+
 	@app.get("/api/state")
 	def state():
 		return game.state()

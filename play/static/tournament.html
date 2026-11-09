@@ -53,6 +53,7 @@ details td, details th { padding: 3px 8px; border-bottom: 1px solid var(--grid);
 	<div class="card">
 		<h1>Checkpoint round robin: does training make it stronger?</h1>
 		<div class="sub" id="subtitle">waiting for the tournament…</div>
+		<div class="sub"><a href="games"><b>Watch the games, live or finished →</b></a></div>
 		<div class="row" style="margin-top:10px"><span id="ptext"></span><span id="eta"></span></div>
 		<div class="bar"><div id="pbar" style="width:0"></div></div>
 		<div class="row"><span id="res"></span><span id="rate"></span></div>
@@ -75,7 +76,7 @@ details td, details th { padding: 3px 8px; border-bottom: 1px solid var(--grid);
 		<div class="legend"><span>row loses</span><span class="ramp"></span><span>row wins</span><span style="margin-left:10px">numbers: row's score, 0–1</span></div>
 		<details><summary>Table view</summary><div id="tbl"></div></details>
 	</div>
-	<div class="sub">Each pair plays every opening twice, colours swapped, with the C++ MCTS at a fixed number of simulations per move. <a href="train">Training curves</a> · <a href="./">Play the engine</a></div>
+	<div class="sub">Each pair plays every opening twice, colours swapped, with the C++ MCTS at a fixed number of simulations per move. <a href="games"><b>Watch the games</b></a> · <a href="train">Training curves</a> · <a href="./">Play the engine</a></div>
 </div>
 <div id="tip"></div>
 <script>
@@ -105,7 +106,7 @@ function heatmap() {
 		for (let b = 0; b < n; b++) {
 			if (a === b) { h += `<td class="diag">–</td>`; continue; }
 			const v = D.score[a][b], strong = v != null && Math.abs(v - 0.5) > 0.3;
-			h += `<td data-a="${a}" data-b="${b}" style="background:${cellColor(v)};color:${strong ? "#fff" : "var(--ink)"}">${v == null ? "" : v.toFixed(2).replace(/^0/, "")}</td>`;
+			h += `<td data-a="${a}" data-b="${b}" style="cursor:${a === b ? "default" : "pointer"};background:${cellColor(v)};color:${strong ? "#fff" : "var(--ink)"}">${v == null ? "" : v.toFixed(2).replace(/^0/, "")}</td>`;
 		}
 		h += "</tr>";
 	}
@@ -113,9 +114,13 @@ function heatmap() {
 	$("hm").onmousemove = e => {
 		const td = e.target.closest("td[data-a]"); if (!td) return hideTip();
 		const a = +td.dataset.a, b = +td.dataset.b, v = D.score[a][b], g = D.pair_games[a][b];
-		showTip(v == null ? `${D.models[a]} vs ${D.models[b]}: not played yet` : `<b>${D.models[a]} vs ${D.models[b]}</b><br>score ${(100 * v).toFixed(1)}% over ${g} games`, e);
+		showTip(v == null ? `${D.models[a]} vs ${D.models[b]}: not played yet` : `<b>${D.models[a]} vs ${D.models[b]}</b><br>score ${(100 * v).toFixed(1)}% over ${g} games<br><span style="color:var(--muted)">click to view the games</span>`, e);
 	};
 	$("hm").onmouseleave = hideTip;
+	$("hm").onclick = e => {
+		const td = e.target.closest("td[data-a]"); if (!td || td.dataset.a === td.dataset.b) return;
+		location.href = `games?a=${D.models[+td.dataset.a]}&b=${D.models[+td.dataset.b]}`;
+	};
 	$("tbl").innerHTML = `<table><tr><th>row \\ col</th>${D.models.map(m => `<th>${short(m)}</th>`).join("")}</tr>` +
 		D.models.map((m, a) => `<tr><th>${m}</th>${D.score[a].map(v => `<td>${v == null ? "–" : v.toFixed(3)}</td>`).join("")}</tr>`).join("") + "</table>";
 }
