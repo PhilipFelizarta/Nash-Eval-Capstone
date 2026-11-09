@@ -38,7 +38,16 @@ class Network:
 		from core import model_framework
 
 		self.kind = kind
-		if path:
+		if path and path.startswith(("http://", "https://")):
+			# Weights live in a GitHub release (or similar), not on disk: fetch to a temp file, load, delete.
+			import tempfile
+			import urllib.request
+			with tempfile.TemporaryDirectory() as tmp:
+				local = os.path.join(tmp, os.path.basename(path))
+				urllib.request.urlretrieve(path, local)
+				model = tf.keras.models.load_model(local, compile=False)
+			self.name = os.path.basename(path)
+		elif path:
 			model = tf.keras.models.load_model(path, compile=False)
 			self.name = os.path.basename(path)
 		else:

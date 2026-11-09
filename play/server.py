@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import threading
+import time
 
 import chess
 import chess.pgn
@@ -123,6 +124,7 @@ def main():
 	parser.add_argument("--batch", type=int, default=256)
 	parser.add_argument("--port", type=int, default=8765)
 	parser.add_argument("--host", default="127.0.0.1")
+	parser.add_argument("--train-progress", default=None, help="progress JSON from distill_lichess_evals.py train --progress, shown at /train")
 	args = parser.parse_args()
 
 	net = Network(args.model, args.kind)
@@ -134,6 +136,20 @@ def main():
 	@app.get("/")
 	def index():
 		return FileResponse(os.path.join(HERE, "static", "index.html"))
+
+	@app.get("/train")
+	def train_page():
+		return FileResponse(os.path.join(HERE, "static", "train.html"))
+
+	@app.get("/api/train")
+	def train_state():
+		path = args.train_progress
+		if not path or not os.path.exists(path):
+			return {}
+		with open(path) as f:
+			data = json.load(f)
+		data["stale"] = time.time() - os.path.getmtime(path) > 120
+		return data
 
 	@app.get("/api/state")
 	def state():
