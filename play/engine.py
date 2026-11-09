@@ -145,8 +145,8 @@ class Engine:
 		return logits, wdl
 
 	# --- search -----------------------------------------------------------------------------------
-	def think(self, board, seconds, on_update=None, update_every=0.15):
-		"""Searches for `seconds`, publishing snapshots; returns the chosen move (UCI)."""
+	def think(self, board, seconds, on_update=None, update_every=0.15, nodes=None):
+		"""Searches for `seconds` (or until `nodes` new simulations), publishing snapshots; returns the chosen move (UCI)."""
 		start = time.perf_counter()
 		positions0 = self.net.positions
 		visits0 = self.tree.root_visits()
@@ -155,7 +155,10 @@ class Engine:
 			elapsed = time.perf_counter() - start
 			if elapsed >= seconds:
 				break
-			x = self.tree.gather(self.batch_size)
+			left = nodes - (self.tree.root_visits() - visits0) if nodes else self.batch_size
+			if left <= 0:
+				break
+			x = self.tree.gather(min(self.batch_size, left))
 			if len(x) or self.tree.num_pending():
 				policy, wdl = self._evaluate(x, board)
 			else:
