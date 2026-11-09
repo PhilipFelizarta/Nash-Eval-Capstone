@@ -1,0 +1,119 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "nash-eval"]
+[Black "stockfish-2400"]
+[Result "0-1"]
+[FEN "r1bqkb1r/1p1npp1p/p2p1npN/6B1/4P3/2N5/PPP2PPP/R2QKB1R b KQkq - 0 1"]
+[SetUp "1"]
+
+1... Bg7 2. Qd2 Nc5 3. f3 Be6 4. O-O-O Nfd7 5. h4 Rf8 6. h5 Qa5 7. hxg6 hxg6 8. Kb1 Bxc3 9. Qxc3 Qxa2+ 10. Kc1 Rc8 11. Nxf7 Nb3+ 12. Qxb3 Qxb3 13. Nxd6+ exd6 14. Bd3 Ne5 15. Rh7 Nxd3+ 16. Kd2 Rxc2+ 17. Ke3 Ne1+ 18. Rd3 Qxd3# 0-1
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "stockfish-2400"]
+[Black "nash-eval"]
+[Result "1/2-1/2"]
+[FEN "r1bqkb1r/1p1npp1p/p2p1npN/6B1/4P3/2N5/PPP2PPP/R2QKB1R b KQkq - 0 1"]
+[SetUp "1"]
+
+1... b5 2. a3 Bb7 3. h4 Bg7 4. f3 Rc8 5. Qd2 Nh5 6. Rd1 Rxc3 7. bxc3 Qa5 8. Qc1 Qxc3+ 9. Bd2 Qc5 10. Be3 Qc3+ 11. Kf2 Nc5 12. Qd2 Qxa3 13. Rh3 Bc3 14. Qc1 Qxc1 15. Bxc1 b4 16. g4 Ng7 17. g5 a5 18. Rh1 Kd7 19. Bc4 Rf8 20. Be3 Nge6 21. Ng4 a4 22. Bd2 Bxd2 23. Rxd2 Kc7 24. Rb1 b3 25. Ke3 Ra8 26. Nf2 Bc6 27. Nd1 Rb8 28. Bxe6 fxe6 29. cxb3 axb3 30. Nb2 e5 31. Rh2 Bb5 32. Ra1 Ne6 33. Ra7+ Rb7 34. Rxb7+ Kxb7 35. Rh1 Kb6 36. Rc1 Ka5 37. Rc8 Kb4 38. Nd1 Nd4 39. Rh8 Be2 40. Rb8+ Ka3 41. Ra8+ Kb4 42. Rb8+ Kc5 43. Rc8+ Kb4 1/2-1/2
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "nash-eval"]
+[Black "stockfish-2400"]
+[Result "1/2-1/2"]
+[FEN "rnbqk2r/p1pp2pp/1p2pn2/6B1/1bPP4/8/PP1N1PPP/R2QKBNR b KQkq - 0 1"]
+[SetUp "1"]
+
+1... Bb7 2. Nf3 Bxf3 3. Qxf3 Bxd2+ 4. Bxd2 Nc6 5. Qd3 Qe7 6. Be2 a5 7. O-O O-O 8. Rad1 e5 9. dxe5 Nxe5 10. Qc2 Rae8 11. Bc3 Nc6 12. Bf3 Qf7 13. b3 Re7 14. Rfe1 Rxe1+ 15. Rxe1 Re8 16. Rxe8+ Qxe8 17. Qd2 d6 18. Bxf6 gxf6 19. Bd5+ Kg7 20. g3 Qd7 21. h4 Ne5 22. Kg2 Qg4 23. Qe3 Qd7 24. Qe2 c6 25. Be4 d5 26. cxd5 cxd5 27. Bd3 Nxd3 28. Qxd3 d4 29. h5 Kh6 30. Qf3 Kg7 31. h6+ Kg6 32. Qd3+ Kg5 33. Qf3 f5 34. Qf4+ Kh5 35. Qe5 b5 36. Qg7 Qd5+ 37. Kh2 Qe4 38. Qxh7 Qe2 39. Qxf5+ Kxh6 40. Qf6+ Kh7 41. Qf5+ Kh8 42. Qf8+ Kh7 43. Qf7+ Kh8 44. Qf6+ Kh7 45. Qf5+ Kg7 46. Qd7+ Kf8 47. Qxd4 Qxa2 48. Qf6+ Kg8 49. Qg6+ Kf8 50. Qd6+ Kf7 51. Qd5+ Kg6 52. Kg2 b4 53. Qe4+ Kg7 54. Qe5+ Kf7 55. Qd5+ Kg7 56. Qg5+ Kh8 57. Qf6+ Kg8 58. Qg6+ Kf8 59. Qf6+ Kg8 60. Qg6+ Kh8 61. Qe8+ Kg7 62. Qe7+ Kg6 63. Qe6+ Kg7 64. Qe5+ Kh6 65. Qf6+ Kh7 66. Qf7+ Kh6 67. g4 Qe2 68. Qf6+ Kh7 69. Qf5+ Kg8 70. Kg3 Qd1 71. Qg6+ Kf8 72. Qf5+ Kg7 73. Qg5+ Kh8 74. Qh6+ Kg8 75. Qg6+ Kf8 76. Qf5+ Ke8 77. Qe5+ Kf8 1/2-1/2
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "stockfish-2400"]
+[Black "nash-eval"]
+[Result "1/2-1/2"]
+[FEN "rnbqk2r/p1pp2pp/1p2pn2/6B1/1bPP4/8/PP1N1PPP/R2QKBNR b KQkq - 0 1"]
+[SetUp "1"]
+
+1... O-O 2. a3 Bxd2+ 3. Bxd2 Bb7 4. Nf3 c5 5. Be2 cxd4 6. Nxd4 Bxg2 7. Rg1 Be4 8. Bb4 Re8 9. Bc3 Nc6 10. Nxc6 Bxc6 11. Qd2 e5 12. Qh6 Qe7 13. f4 Kh8 14. Qh4 Ne4 15. Qxe7 Rxe7 16. Rf1 Nxc3 17. bxc3 exf4 18. Rxf4 Rae8 19. Ra2 g6 20. a4 Kg7 21. a5 bxa5 22. Kf2 a4 23. Bd1 Re5 24. h4 Ra5 25. Bf3 a3 26. c5 Rxc5 27. Bxc6 dxc6 28. Rxa3 a5 29. Kf3 Ree5 30. Rfa4 Kf6 31. Rb3 Rf5+ 32. Ke2 Rfe5+ 33. Kf3 h5 34. Rd4 Rf5+ 35. Ke3 Rfe5+ 36. Kf3 Rf5+ 37. Ke3 Rce5+ 38. Kd2 Rf2+ 39. Kd3 Rf3+ 40. Kc4 a4 41. Rb2 a3 42. Rb6 a2 43. Ra6 Re2 44. Rd6+ Kg7 45. Rdxc6 Rf4+ 46. Kb5 Rb2+ 47. Kc5 Rf5+ 48. Kc4 Rf4+ 49. Kd5 Rxh4 50. Rxg6+ Kf7 51. Rgf6+ Kg7 52. Rg6+ Kf7 53. Raf6+ Ke7 54. Ra6 1/2-1/2
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "nash-eval"]
+[Black "stockfish-2400"]
+[Result "1-0"]
+[FEN "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/1P2PN2/PBPNBPPP/R2Q1RK1 b - - 0 1"]
+[SetUp "1"]
+
+1... cxd4 2. exd4 a5 3. c4 Bc7 4. Rc1 Ne7 5. Re1 Bd7 6. Ne5 a4 7. Ba3 Be8 8. cxd5 Nfxd5 9. Bf3 Bc6 10. Ndc4 Re8 11. Be4 Nf5 12. Nxc6 bxc6 13. g3 Qf6 14. Bc5 h5 15. Qxh5 Reb8 16. Ne5 g6 17. Qd1 Bxe5 18. dxe5 Qxe5 19. bxa4 Qb2 20. Bxf5 exf5 21. Rc2 Qb7 22. Qd4 Qa6 23. Rc4 Re8 24. Rcc1 Rxe1+ 25. Rxe1 Nc7 26. Re7 Rb8 27. Rxc7 Rb1+ 28. Kg2 Qf1+ 29. Kf3 Qh1+ 30. Kf4 Qc1+ 31. Ke5 Qe1+ 32. Qe3 Qd1 33. Kf6 Rb7 34. Qe8+ Kh7 35. Qxf7+ Kh8 36. Qg7# 1-0
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "stockfish-2400"]
+[Black "nash-eval"]
+[Result "1/2-1/2"]
+[FEN "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/1P2PN2/PBPNBPPP/R2Q1RK1 b - - 0 1"]
+[SetUp "1"]
+
+1... cxd4 2. Nxd4 Nxd4 3. Bxd4 e5 4. Bb2 Re8 5. c4 d4 6. exd4 exd4 7. Re1 Bb4 8. a3 Bc3 9. Bxc3 dxc3 10. Nf1 Bf5 11. b4 c2 12. Qd2 Qxd2 13. Nxd2 Rad8 14. Nf1 Bd3 15. Bxd3 Rxe1 16. Rxe1 Rxd3 17. Ne3 Rc3 18. Rc1 Rxa3 19. Rxc2 Ra1+ 20. Nf1 Rb1 21. g3 Rxb4 22. Ne3 a5 23. c5 g6 24. h4 a4 25. Kg2 Kf8 26. h5 Nxh5 27. c6 bxc6 28. Rxc6 Kg7 29. Ra6 Nf6 30. Rxf6 Kxf6 31. Nd5+ Ke5 32. Nxb4 Kd4 33. Na2 Kc4 34. g4 Kb3 35. Nc1+ Kb2 36. Nd3+ Kc3 37. Nc1 a3 38. f4 Kb2 39. Nd3+ Kc3 40. Nc1 Kb2 41. Nd3+ Kc2 42. Nb4+ Kb3 43. Nd3 Kc2 44. Nb4+ Kb3 45. Nd3 1/2-1/2
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "nash-eval"]
+[Black "stockfish-2400"]
+[Result "1-0"]
+[FEN "r2q1rk1/pbpn1pbp/1p3np1/4P1N1/4p3/2P3P1/PP1N1PBP/R1BQR1K1 b - - 0 1"]
+[SetUp "1"]
+
+1... Nxe5 2. Ndxe4 Nh5 3. Qxd8 Raxd8 4. Nxh7 Bxe4 5. Nxf8 Nf3+ 6. Bxf3 Bxf3 7. Nxg6 fxg6 8. Bg5 Nf6 9. Re7 Rd5 10. Bxf6 Bxf6 11. Rxc7 Bg7 12. Re1 Bf8 13. Rxa7 b5 14. Rb7 b4 15. cxb4 Rd2 16. Rb8 Rxb2 17. a3 g5 18. Rb5 Kg7 19. Rxg5+ Kf6 20. Ra5 Bh6 21. Ra6+ Kf7 22. Rxh6 Kg8 23. Rg6+ Kh8 24. Rh6+ Kg8 25. Rg6+ Kf7 26. Rb6 Rd2 27. h3 Rd8 28. a4 Kg7 29. a5 Rd2 30. a6 Rd5 31. a7 Rg5 32. Re7+ Kh8 33. Rb8+ Rg8 34. Rxg8+ Kxg8 35. Rc7 Kf8 36. b5 Ke8 37. b6 Kd8 38. g4 Bd5 39. Kh2 Ba8 40. g5 Bc6 41. Rxc6 Ke7 42. a8=Q Kd7 43. Qb7+ Kd8 44. Rc8# 1-0
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "stockfish-2400"]
+[Black "nash-eval"]
+[Result "1-0"]
+[FEN "r2q1rk1/pbpn1pbp/1p3np1/4P1N1/4p3/2P3P1/PP1N1PBP/R1BQR1K1 b - - 0 1"]
+[SetUp "1"]
+
+1... Nxe5 2. Ndxe4 Nxe4 3. Qxd8 Raxd8 4. Nxe4 Nd3 5. Rd1 h6 6. Nf6+ Bxf6 7. Bxb7 Rfe8 8. h4 Re2 9. Ba6 Nxc1 10. Rxd8+ Bxd8 11. Bxe2 Nxe2+ 12. Kg2 Bf6 13. Re1 Nxc3 14. Re8+ Kg7 15. bxc3 Bxc3 16. Re7 c5 17. Rxa7 Bd4 18. a4 c4 19. Rc7 c3 20. Rc4 Bf6 21. Rc6 Bd4 22. Rc4 Bf6 23. Kf1 g5 24. hxg5 hxg5 25. Ke1 Be7 26. Ke2 f5 27. Rxc3 Bc5 28. Rxc5 bxc5 29. Kd2 Kf6 30. a5 Ke7 31. g4 f4 32. a6 Kd6 33. a7 Kc7 34. a8=Q c4 35. Qd5 c3+ 36. Kc2 f3 37. Kxc3 Kb6 38. Kd4 Kc7 39. Kc4 Kb6 40. Qd7 Ka5 41. Qa7# 1-0
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "nash-eval"]
+[Black "stockfish-2400"]
+[Result "1/2-1/2"]
+[FEN "r1bqk2r/pppn1ppp/3bpn2/3p4/3P1P2/2PBPN2/PP4PP/RNBQ1RK1 b kq - 0 1"]
+[SetUp "1"]
+
+1... O-O 2. Nbd2 a6 3. Ne5 b5 4. a4 Bb7 5. axb5 Qc8 6. bxa6 Bxa6 7. Rxa6 Rxa6 8. g4 Ra1 9. g5 Bxe5 10. fxe5 Ne8 11. Nb3 Ra2 12. e4 dxe4 13. Bxe4 g6 14. h4 c5 15. h5 Qc7 16. hxg6 hxg6 17. Rf2 Ng7 18. Rh2 Rd8 19. Qf3 c4 20. Nd2 Ra1 21. Rh8+ Kxh8 22. Qxf7 Rxc1+ 23. Kg2 Rc8 24. Qxg6 Nf8 25. Qh6+ Kg8 26. Nf3 Rb8 27. d5 Rg1+ 28. Kxg1 Qa7+ 29. Nd4 Rb3 30. dxe6 Rb6 31. Bd5 Qa1+ 32. Kf2 Rxb2+ 33. Ne2 Qa7+ 34. Kf3 Qc5 35. Be4 Ngxe6 36. Qf6 Rb5 37. Nd4 Qxe5 38. Nxb5 Nxg5+ 39. Qxg5+ Qxg5 40. Nd6 Qh5+ 41. Kg3 Qe5+ 42. Kf3 Qh5+ 43. Kg3 Qg5+ 44. Kf2 Qc5+ 45. Kf3 1/2-1/2
+
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "stockfish-2400"]
+[Black "nash-eval"]
+[Result "1/2-1/2"]
+[FEN "r1bqk2r/pppn1ppp/3bpn2/3p4/3P1P2/2PBPN2/PP4PP/RNBQ1RK1 b kq - 0 1"]
+[SetUp "1"]
+
+1... O-O 2. Nbd2 c5 3. Ne5 b6 4. e4 cxd4 5. cxd4 dxe4 6. Bxe4 Nxe4 7. Nxe4 Nf6 8. Nxf6+ Qxf6 9. Qd3 Bb7 10. a4 Rfd8 11. Bd2 Qf5 12. Qxf5 exf5 13. a5 Bxe5 14. fxe5 Rxd4 15. Be1 g6 16. Bc3 Rd5 17. axb6 axb6 18. Rfd1 Rxa1 19. Rxa1 Kf8 20. Kf2 Ke7 21. Ra7 Rd7 22. Ra4 Be4 23. Rb4 Rb7 24. Ra4 Ke6 25. Ra8 f4 26. Rd8 Rd7 27. Rh8 h5 28. Rb8 Rb7 29. Rxb7 Bxb7 30. Bd4 b5 31. h4 b4 32. Bb6 Kxe5 33. Ba5 b3 34. g3 fxg3+ 35. Kxg3 Ke4 36. Bb4 Ke3 37. Ba5 Kd3 38. Bb6 Kc2 39. Bd4 Kd3 40. Bc3 Ke3 41. Be5 Ke4 42. Bg7 Kf5 43. Bh6 Ke4 44. Bg7 Bd5 45. Bf6 Kf5 46. Bd4 Ke4 47. Bc3 f5 48. Bf6 f4+ 49. Kf2 Kf5 50. Bd8 Be4 51. Bg5 Kg4 52. Be7 Bd3 53. Kg2 Be4+ 54. Kf2 Bd3 55. Bf6 Kf5 56. Bg5 Be4 57. Kf1 Bd3+ 58. Kg2 Ke4 59. Kf2 Bc2 60. Be7 Kf5 61. Ke2 Kg4 62. Kf2 1/2-1/2
