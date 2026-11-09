@@ -198,10 +198,21 @@ def train(args):
 	for path in (args.out, args.progress):
 		if path:
 			os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-	callbacks = [Progress(args.progress)] if args.progress else []
-	model.fit(batches(tr, True), steps_per_epoch=steps, epochs=args.epochs, validation_data=batches(val, False),
-	          validation_steps=len(val) // args.batch, callbacks=callbacks, verbose=2)
+	# Checkpoint after every epoch (weights + optimizer state), so a crash costs at most one epoch: --resume picks it up.
+	last = args.out.replace(".keras", ".last.keras")
+	initial_epoch = 0
+	if args.resume and os.path.exists(last):
+		model = keras.models.load_model(last)
+		initial_epoch = int(model.optimizer.iterations.numpy()) // steps
+		print(f"resuming from {last} at epoch {initial_epoch + 1}", flush=True)
+	callbacks = [keras.callbacks.ModelCheckpoint(last)]
+	if args.progress:
+		callbacks.append(Progress(args.progress))
+	model.fit(batches(tr, True), steps_per_epoch=steps, epochs=args.epochs, initial_epoch=initial_epoch,
+	          validation_data=batches(val, False), validation_steps=len(val) // args.batch, callbacks=callbacks, verbose=2)
 	model.save(args.out)
+	if os.path.exists(last):
+		os.remove(last)
 	print(f"saved {args.out} ({os.path.getsize(args.out) / 1e6:.1f} MB)", flush=True)
 
 
@@ -220,6 +231,7 @@ def main():
 	t.add_argument("--batch", type=int, default=1024)
 	t.add_argument("--lr", type=float, default=2e-3)
 	t.add_argument("--val", type=int, default=20_480)  # a whole number of batches
+	t.add_argument("--resume", action="store_true", help="continue from the per-epoch checkpoint next to --out")
 	t.add_argument("--progress", default=None, help="JSON file updated during training (for the play UI's /train page)")
 	args = parser.parse_args()
 	prep(args) if args.cmd == "prep" else train(args)
