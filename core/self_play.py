@@ -1,9 +1,21 @@
 import chess
 import chess.pgn
 import numpy as np
-import tensorflow as tf
 from core.chess_environment import fast_fen_to_example
-from tensorflow.keras.models import load_model
+
+# Value convention used everywhere in this file:
+# the model maps a position to [P(side to move wins), P(draw), P(side to move loses)].
+# This matches the training labels (label 0 = side to move went on to win, see chess_database.py).
+# Depth-1 search scores positions where the opponent is to move, so for the mover the
+# same vector reads [loss, draw, win]. Depth-2 scores positions where the mover is to
+# move again, so it reads [win, draw, loss].
+
+DRAW = np.array([0.0, 1.0, 0.0])
+
+
+def is_drawn(board):
+	"""True if the position is a draw by rule (or one the side to move can claim right now)."""
+	return board.is_stalemate() or board.is_insufficient_material() or board.is_fifty_moves() or board.is_repetition(3)
 
 
 def softmax(x):
@@ -22,13 +34,13 @@ def select_stochastic_move(board, model, temp=1.0):
 		temp (float): Temperature for softmax exploration (higher = more randomness).
 
 	Returns:
-		tuple: (chess.Move, np.array) The selected move and its WDL probabilities.
+		tuple: (chess.Move, np.array) The selected move and the model's output for the
+		position after it, i.e. [loss, draw, win] from the mover's point of view.
 	"""
 	legal_moves = list(board.legal_moves)
 	if not legal_moves:
 		return None, None  # No legal moves, game over
 
-	best_checkmate_move = None
 	position_tensors = []
 	move_map = {}
 
@@ -38,7 +50,7 @@ def select_stochastic_move(board, model, temp=1.0):
 		# **Immediate Checkmate Handling**
 		if board.is_checkmate():
 			board.pop()  # Restore board state
-			return move, np.array([0.0, 0.0, 1.0])  # Guaranteed win
+			return move, np.array([0.0, 0.0, 1.0])  # Side to move (the opponent) has lost
 
 		# **Move Encoding**
 		position_tensors.append(fast_fen_to_example(board.fen()))
@@ -52,21 +64,29 @@ def select_stochastic_move(board, model, temp=1.0):
 	# **Override Model Predictions for Draws**
 	for i, move in move_map.items():
 		board.push(move)
-		if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
-			predictions[i] = np.array([0.0, 1.0, 0.0])  # Force draw to be neutral (WDL = 0)
+		if is_drawn(board):
+			predictions[i] = DRAW  # Force draw to be neutral (WDL = 0)
 		board.pop()
 
-	# **Compute Softmax Over (Win) / Temperature**
+	# **Compute Softmax Over (Win - Loss) / Temperature, from the mover's point of view**
+	move_values = predictions[:, 2] - predictions[:, 0]
 	if temp != 0.0:
-		move_values = (predictions[:, 2] - predictions[:, 0]) / temp
-		move_probabilities = softmax(move_values)
+		move_probabilities = softmax(move_values / temp)
 
 		# **Select Move Stochastically**
 		selected_index = np.random.choice(len(legal_moves), p=move_probabilities)
 	else:
-		selected_index = np.argmax(predictions[:, 2] - predictions[:, 0])
+		selected_index = np.argmax(move_values)
 
 	return move_map[selected_index], predictions[selected_index]
+
+
+def write_game(game, result, pgn_save_path):
+	game.headers["Result"] = result
+	with open(pgn_save_path, "w", encoding="utf-8") as pgn_file:
+		pgn_file.write(str(game))
+
+	print(f"Game saved to {pgn_save_path}")
 
 
 def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.0, max_moves=100, starting_fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
@@ -80,8 +100,10 @@ def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.
 		temp (float): Temperature for move randomness.
 
 	Returns:
-		str: The final result of the game ("1-0", "0-1", "1/2-1/2").
+		str: The final result of the game ("1-0", "0-1", "1/2-1/2", or "*" if max_moves was hit).
 	"""
+	from tensorflow.keras.models import load_model
+
 	# Load models
 	model_a = load_model(model_a_path, compile=False)
 	model_b = load_model(model_b_path, compile=False)
@@ -109,30 +131,28 @@ def self_play_game_stochastic(model_a_path, model_b_path, pgn_save_path, temp=1.
 
 		# Format WDL probabilities with 2 decimal places
 		l, d, w = map(lambda x: f"{x:.2f}", wdl)
-		node.comment = f"WDL: {w}/{d}/{l}"  # Save WDL evaluation
+		node.comment = f"WDL: {w}/{d}/{l}"  # Save WDL evaluation (mover's point of view)
 
 		turn_count += 1
 
 		if turn_count > max_moves * 2:
 			break
 
-		if wdl[0] > 0.95: # 95% chance of loss resign.
-			resign_color = board.turn # True.. black resigns
+		if wdl[0] > 0.95: # 95% chance the mover loses: the mover resigns.
+			resign_color = board.turn # Side to move now is the winner. True.. black resigns
 			break
-
-	# Save the PGN file with WDL evaluations
-	with open(pgn_save_path, "w", encoding="utf-8") as pgn_file:
-		pgn_file.write(str(game))
-
-	print(f"Game saved to {pgn_save_path}")
 
 	if resign_color is not None: # resignation
 		map_resignation = {True: "1-0", False: "0-1"}
 		print("Game Resigned: ", map_resignation[resign_color])
-		return map_resignation[resign_color]
+		result = map_resignation[resign_color]
+	else:
+		result = board.result()
 
-	# Return the game result
-	return board.result()
+	# Save the PGN file with WDL evaluations
+	write_game(game, result, pgn_save_path)
+	return result
+
 
 def select_depth2_move(board, model):
 	"""
@@ -140,104 +160,84 @@ def select_depth2_move(board, model):
 
 	Args:
 		board (chess.Board): Current game state.
-		model (tf.keras.Model): Model returning [loss, draw, win] from current player's POV.
+		model (tf.keras.Model): Model returning [win, draw, loss] for the side to move.
 
 	Returns:
-		tuple: (chess.Move, np.array) Selected move and its estimated WDL.
+		tuple: (chess.Move, np.array) Selected move and its worst-case leaf, which is
+		[win, draw, loss] from the mover's point of view.
 	"""
-	def expected_score(p): return 0.5 * p[1] + 1.0 * p[0]
+	def expected_score(p): return 1.0 * p[0] + 0.5 * p[1]  # The mover is to move at every leaf
 
 	legal_moves = list(board.legal_moves)
 	if not legal_moves:
 		return None, None
 
-	move_map = {}  # Maps move index to (parent move, child move)
-	position_tensors = []  # Batched evaluation inputs
+	leaf_parents = []  # Our move that leads to each leaf
+	leaf_values = []  # Exact value for terminal leaves, None if the model should score it
+	position_tensors = []  # Batched evaluation inputs, one per None in leaf_values
 
 	# Build the full depth-2 tree and gather all positions to evaluate
-	for i, move in enumerate(legal_moves):
+	for move in legal_moves:
 		board.push(move)
 
-		# Check for immediate win
+		# Immediate win
 		if board.is_checkmate():
 			board.pop()
-			return move, np.array([1.0, 0.0, 0.0])  # Immediate win
+			return move, np.array([1.0, 0.0, 0.0])
 
-		opponent_moves = list(board.legal_moves)
+		# Our move ends the game in a draw (stalemate, repetition, ...): it's a leaf
+		if is_drawn(board):
+			leaf_parents.append(move)
+			leaf_values.append(DRAW)
+			board.pop()
+			continue
 
-		# If opponent has no move, it's a terminal state
-		if not opponent_moves:
-			if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
-				position_tensors.append(None)  # Handle separately
-				move_map[len(position_tensors) - 1] = (move, None)
-			else:
-				# Opponent is checkmated, this move is winning
-				board.pop()
-				return move, np.array([1.0, 0.0, 0.0])
-
-		for opp_move in opponent_moves:
+		for opp_move in board.legal_moves:
 			board.push(opp_move)
-			fen = board.fen()
-			position_tensors.append(fast_fen_to_example(fen))
-			move_map[len(position_tensors) - 1] = (move, opp_move)
+			leaf_parents.append(move)
+
+			if board.is_checkmate():
+				leaf_values.append(np.array([0.0, 0.0, 1.0]))  # The opponent mates us
+			elif is_drawn(board):
+				leaf_values.append(DRAW)
+			else:
+				leaf_values.append(None)
+				position_tensors.append(fast_fen_to_example(board.fen()))
+
 			board.pop()
 
 		board.pop()
 
-	# Run predictions in batch (excluding special cases)
-	valid_indices = [i for i, x in enumerate(position_tensors) if x is not None]
-	batched_input = np.array([position_tensors[i] for i in valid_indices])
-	predictions = model.predict(batched_input, batch_size=len(batched_input), verbose=0)
+	# Run predictions in batch (terminal leaves are already scored)
+	if position_tensors:
+		predictions = iter(model.predict(np.array(position_tensors), batch_size=len(position_tensors), verbose=0))
+		leaf_values = [value if value is not None else next(predictions) for value in leaf_values]
 
-	# Insert predictions back into the full list
-	full_predictions = []
-	j = 0
-	for i in range(len(position_tensors)):
-		if position_tensors[i] is None:
-			full_predictions.append(np.array([0.0, 1.0, 0.0]))  # Draw by rule
-		else:
-			# Handle draw-like states (stalemate, insufficient material, etc.)
-			move = move_map[i][1]
-			board.push(move)
-			if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
-				full_predictions.append(np.array([0.0, 1.0, 0.0]))
-			else:
-				full_predictions.append(predictions[j])
-			board.pop()
-			j += 1
+	# For each of our moves, assume the opponent picks the reply that is worst for us
+	worst_by_move = {}
+	for parent_move, value in zip(leaf_parents, leaf_values):
+		if parent_move not in worst_by_move or expected_score(value) < expected_score(worst_by_move[parent_move]):
+			worst_by_move[parent_move] = value
 
-	# Aggregate: for each player move, find worst-case opponent response
-	from collections import defaultdict
+	# Then pick the move with the best worst case
+	best_move = max(worst_by_move, key=lambda move: expected_score(worst_by_move[move]))
+	return best_move, worst_by_move[best_move]
 
-	move_to_evals = defaultdict(list)
-	for i, (parent_move, _) in move_map.items():
-		move_to_evals[parent_move].append(full_predictions[i])
-
-	# Minimize our win probability (opponent plays best), then select the move with max worst-case win
-	best_move = None
-	best_eval = None
-
-	for move, evals in move_to_evals.items():
-		worst = min(evals, key=lambda p: expected_score(p))  # Opponent minimizes our win
-		if best_eval is None or expected_score(worst) > expected_score(best_eval):
-			best_move = move
-			best_eval = worst
-
-	return best_move, best_eval
 
 def self_play_game_depth2(model_a_path, model_b_path, pgn_save_path, max_moves=100, starting_fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
 	"""
-	Runs a stochastic self-play game between two models and saves the PGN with WDL evaluations.
+	Runs a depth-2 self-play game between two models and saves the PGN with WDL evaluations.
 
 	Args:
 		model_a_path (str): Path to the first model (plays White).
 		model_b_path (str): Path to the second model (plays Black).
 		pgn_save_path (str): Path to save the PGN file.
-		temp (float): Temperature for move randomness.
 
 	Returns:
-		str: The final result of the game ("1-0", "0-1", "1/2-1/2").
+		str: The final result of the game ("1-0", "0-1", "1/2-1/2", or "*" if max_moves was hit).
 	"""
+	from tensorflow.keras.models import load_model
+
 	# Load models
 	model_a = load_model(model_a_path, compile=False)
 	model_b = load_model(model_b_path, compile=False)
@@ -265,27 +265,24 @@ def self_play_game_depth2(model_a_path, model_b_path, pgn_save_path, max_moves=1
 
 		# Format WDL probabilities with 2 decimal places
 		w, d, l = map(lambda x: f"{x:.2f}", wdl)
-		node.comment = f"WDL: {w}/{d}/{l}"  # Save WDL evaluation
+		node.comment = f"WDL: {w}/{d}/{l}"  # Save WDL evaluation (mover's point of view)
 
 		turn_count += 1
 
 		if turn_count > max_moves * 2:
 			break
 
-		if wdl[-1] > 0.95: # 95% chance of loss resign.
-			resign_color = board.turn # True.. black resigns
+		if wdl[-1] > 0.95: # 95% chance the mover loses: the mover resigns.
+			resign_color = board.turn # Side to move now is the winner. True.. black resigns
 			break
-
-	# Save the PGN file with WDL evaluations
-	with open(pgn_save_path, "w", encoding="utf-8") as pgn_file:
-		pgn_file.write(str(game))
-
-	print(f"Game saved to {pgn_save_path}")
 
 	if resign_color is not None: # resignation
 		map_resignation = {True: "1-0", False: "0-1"}
 		print("Game Resigned: ", map_resignation[resign_color])
-		return map_resignation[resign_color]
+		result = map_resignation[resign_color]
+	else:
+		result = board.result()
 
-	# Return the game result
-	return board.result()
+	# Save the PGN file with WDL evaluations
+	write_game(game, result, pgn_save_path)
+	return result

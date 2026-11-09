@@ -17,6 +17,10 @@ from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 if __name__ == "__main__":
 	n_blocks = int(os.getenv("N_BLOCKS"))
 	n_filters = int(os.getenv("N_FILTERS"))
+	lr = float(os.getenv("LR", "3e-4"))
+	resume_from = os.getenv("RESUME_FROM")  # Checkpoint to continue training from (optional)
+	resume_lr = float(os.getenv("RESUME_LR", "3e-5"))
+	skip_games = int(os.getenv("SKIP_GAMES", "0"))  # Games the previous run already consumed
 
 	strategy = tf.distribute.MirroredStrategy()
 	BATCH_SIZE = 64
@@ -25,10 +29,9 @@ if __name__ == "__main__":
 	print(f"Number of GPUS: {strategy.num_replicas_in_sync}\nBatch Size: {GLOBAL_BATCH_SIZE}")
 
 	zst_file = "data/LumbrasGigaBase 2024.pgn.zst"
-	dataset = chess_database.get_tf_dataset(zst_file, batch_size=GLOBAL_BATCH_SIZE).repeat()
+	dataset = chess_database.get_tf_dataset(zst_file, batch_size=GLOBAL_BATCH_SIZE, skip_games=skip_games).repeat()
 
-	model_name = f"PART2_RESNET_36p_{n_blocks}x{n_filters}"
-	model_path =f"models/RESNET_36p_{n_blocks}x{n_filters}/RESNET_36p_4x512_022.h5"
+	model_name = f"RESNET_36p_{n_blocks}x{n_filters}" + ("_PART2" if resume_from else "")
 	print(dataset.take(1))
 
 	os.makedirs("models", exist_ok=True)
@@ -36,19 +39,21 @@ if __name__ == "__main__":
 	os.makedirs("figures", exist_ok=True)
 
 	with strategy.scope():
-		if os.path.exists(model_path):
-			print(f"Loading existing model from {model_path}")
-			model = keras.models.load_model(model_path)
+		if resume_from:
+			if not os.path.exists(resume_from):
+				raise FileNotFoundError(f"RESUME_FROM checkpoint not found: {resume_from}")
+			print(f"Loading existing model from {resume_from}, skipping the first {skip_games} games")
+			model = keras.models.load_model(resume_from)
 
-			new_lr = 1e-6  # Lower learning rate.
-			optimizer = keras.optimizers.Adam(learning_rate=new_lr)
-			model.compile(optimizer=optimizer, 
+			optimizer = keras.optimizers.Adam(learning_rate=resume_lr)  # Lower learning rate.
+			model.compile(optimizer=optimizer,
 				 loss=keras.losses.SparseCategoricalCrossentropy(),
-				 metrics=['accuracy']) 
+				 metrics=['accuracy'],
+				 weighted_metrics=['accuracy'])
 		else:
-			print("No existing model found. Creating new model.")
+			print("Creating new model.")
 			model = model_framework.exploratory_model(
-				FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=1e-5
+				FILTERS=n_filters, BLOCKS=n_blocks, dropout=0.25, lr=lr
 			)
 
 	model.summary()
@@ -57,9 +62,10 @@ if __name__ == "__main__":
 		f"models/{model_name}/{model_name}" + "_{epoch:03d}.h5",
 		save_freq="epoch", save_weights_only=False
 	)
-	csv_logger = CSVLogger("logs/training_log.csv", append=True)
+	log_file = f"logs/{model_name}_training_log.csv"
+	csv_logger = CSVLogger(log_file, append=True)
 	plot_callback = model_framework.TrainingPlotCallback(
-		save_interval=1, plot_path=f"figures/training/{model_name}_training.png"
+		save_interval=1, plot_path=f"figures/training/{model_name}_training.png", log_file=log_file
 	)
 
 	history = model.fit(

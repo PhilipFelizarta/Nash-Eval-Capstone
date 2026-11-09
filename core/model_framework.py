@@ -26,10 +26,10 @@ class TrainingPlotCallback(Callback):
 		if (epoch + 1) % self.save_interval == 0:  # Save every `save_interval` epochs
 			# Load CSV log
 			if os.path.exists(self.log_file):
-				log_data = np.genfromtxt(self.log_file, delimiter=',', skip_header=1)
-				epochs = log_data[:, 0] if log_data.ndim > 1 else np.array([log_data[0]])
-				loss = log_data[:, 2] if log_data.ndim > 1 else np.array([log_data[2]])
-				accuracy = log_data[:, 1] if log_data.ndim > 1 else np.array([log_data[1]])
+				log_data = np.atleast_1d(np.genfromtxt(self.log_file, delimiter=',', names=True))
+				epochs = log_data["epoch"]
+				loss = log_data["loss"]
+				accuracy = log_data["accuracy"]
 			else:
 				return  # No data to plot yet
 
@@ -114,14 +114,15 @@ def exploratory_model(FILTERS=64, BLOCKS=4, SE_CHANNELS=16, lr=3e-3, dropout=0.3
 	v = layers.Dropout(dropout)(v)  # Dropout before dense layer
 	v = layers.Dense(128, activation="relu")(v)
 	v = layers.Dropout(dropout)(v)  # Dropout after dense layer
-	outputs = layers.Dense(3, activation="softmax")(v)  # VALUE_WDL format
+	outputs = layers.Dense(3, activation="softmax", dtype="float32")(v)  # VALUE_WDL format, float32 under mixed precision
 
 	# **Build Model**
 	model = keras.Model(inputs, outputs)
 	model.compile(
 		optimizer=keras.optimizers.Adam(learning_rate=lr),
 		loss=keras.losses.SparseCategoricalCrossentropy(),
-		metrics=['accuracy']
+		metrics=['accuracy'],
+		weighted_metrics=['accuracy']  # Same importance weights as the loss
 	)
 
 	return model
@@ -179,7 +180,7 @@ def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1,
 		x = transformer_block(x, n_dim, n_heads, ff_dim, dropout_rate)
 
 	x = layers.Flatten()(x)
-	outputs = layers.Dense(3, activation="softmax")(x)  # Win, Draw, Loss classification
+	outputs = layers.Dense(3, activation="softmax", dtype="float32")(x)  # Win, Draw, Loss classification, float32 under mixed precision
 
 	model = Model(inputs, outputs)
 	nadam_optimizer = keras.optimizers.Nadam(
@@ -193,6 +194,7 @@ def create_chess_transformer(n_blocks, n_heads, n_dim, ff_dim, dropout_rate=0.1,
 	model.compile(
 		optimizer=nadam_optimizer,
 		loss=keras.losses.SparseCategoricalCrossentropy(),
-		metrics=['accuracy']
+		metrics=['accuracy'],
+		weighted_metrics=['accuracy']  # Same importance weights as the loss
 	)
 	return model

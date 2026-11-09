@@ -27,7 +27,7 @@ def serialize_example(tensor, label, weight):
 	Creates a serialized TensorFlow Example for TFRecord.
 	"""
 
-	tensor = tensor.astype(np.uint8)  # Ensure it's stored efficiently
+	tensor = tensor.astype(np.float16)  # Half the size of float32; uint8 would zero the material channel (35)
 	feature = {
 		'tensor': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tensor.tobytes()])),
 		'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),

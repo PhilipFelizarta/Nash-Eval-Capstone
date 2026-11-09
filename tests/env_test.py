@@ -121,24 +121,53 @@ def test_legal_moves_correctness():
 	fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1"  # White e4 move
 	tensor = fast_fen_to_example(fen)
 
-	# Generate pseudo-legal moves
-	piece_positions = {
-		"P_white": [(4, 4)],  # e4 pawn
-	}
-	tensor = generate_pseudo_legal_moves(tensor, piece_positions)
+	# Regenerating the move planes from the piece planes is idempotent
+	assert np.array_equal(generate_pseudo_legal_moves(tensor.copy()), tensor)
 
 	# Expect e5 to be a legal move for the pawn
 	assert tensor[3, 4, 19] == 1  # e5 move
 
+def test_move_planes_are_hero_relative():
+	"""
+	A position and its colour-mirrored twin (black to move) must encode identically,
+	move planes included.
+	"""
+	pairs = [
+		("4k3/8/8/8/8/8/4P3/4K1N1 w - - 0 1", "4k1n1/4p3/8/8/8/8/8/4K3 b - - 0 1"),
+		("r3k2r/pppq1ppp/2n2n2/3pp3/1b2P3/2NP1N2/PPPBQPPP/R3K2R w KQkq - 0 1",
+		 "r3k2r/pppbqppp/2np1n2/1B2p3/3PP3/2N2N2/PPPQ1PPP/R3K2R b KQkq - 0 1"),
+	]
+	for white_fen, black_fen in pairs:
+		assert np.array_equal(fast_fen_to_example(white_fen), fast_fen_to_example(black_fen))
+
+def test_sliding_moves_stop_at_blockers():
+	fen = "8/8/8/8/1p1R2P1/8/8/8 w - - 0 1"  # Rook on d4, villain pawn b4, hero pawn g4
+	tensor = fast_fen_to_example(fen)
+
+	rook_plane = tensor[4, :, 23]
+	assert list(rook_plane) == [0, 1, 1, 0, 1, 1, 1, 0]  # Ray includes the first blocker and stops there
+	assert tensor[:, 3, 23].sum() == 7  # Open file
+
+	# Every slider plane is populated in the start position
+	start = fast_fen_to_example("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+	for plane in (21, 22, 23, 24, 28, 29, 30, 31):
+		assert start[:, :, plane].sum() > 0
+
+def test_blocked_pawn_push():
+	tensor = fast_fen_to_example("8/8/8/8/8/4n3/4P3/8 w - - 0 1")  # e2 pawn blocked by e3 knight
+	assert tensor[:, :, 19].sum() == 0  # No pushes, single or double
+	assert tensor[5, 3, 33] == 1 and tensor[5, 5, 33] == 1  # Still attacks d3 and f3
+
 def test_fen_loop():
 	fens = [
 		"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1",
-		"rnr3k1/pq1b1pbp/3p2p1/1p1Pp3/4PPn1/P1NNB1P1/1P4BP/2RQ1RK1 w - - 1 17"
+		"rnr3k1/pq1b1pbp/3p2p1/1p1Pp3/4PPn1/P1NNB1P1/1P4BP/2RQ1RK1 w - - 1 17",
+		"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b Kq e3 0 1"
 	]
 
 	for fen in fens:
 		tensor = fast_fen_to_example(fen)
-		reconstruction_fen = tensor_to_fen(tensor[:, :, :19])
+		reconstruction_fen = tensor_to_fen(tensor[:, :, :19], is_white_turn=fen.split()[1] == "w")
 
 		parts = fen.split()
 		board_part, turn, castling_rights, en_passant = parts[0], parts[1], parts[2], parts[3]
