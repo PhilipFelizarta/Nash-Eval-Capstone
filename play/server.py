@@ -124,6 +124,7 @@ def main():
 	parser.add_argument("--batch", type=int, default=256)
 	parser.add_argument("--port", type=int, default=8765)
 	parser.add_argument("--host", default="127.0.0.1")
+	parser.add_argument("--tournament-progress", default=None, help="progress.json from self_play_agent/checkpoint_round_robin.py, shown at /tournament")
 	parser.add_argument("--train-progress", default=None, help="progress JSON from distill_lichess_evals.py train --progress, shown at /train")
 	args = parser.parse_args()
 
@@ -141,15 +142,25 @@ def main():
 	def train_page():
 		return FileResponse(os.path.join(HERE, "static", "train.html"))
 
-	@app.get("/api/train")
-	def train_state():
-		path = args.train_progress
+	def progress(path, stale_after):
 		if not path or not os.path.exists(path):
 			return {}
 		with open(path) as f:
 			data = json.load(f)
-		data["stale"] = time.time() - os.path.getmtime(path) > 120
+		data["stale"] = time.time() - os.path.getmtime(path) > stale_after
 		return data
+
+	@app.get("/api/train")
+	def train_state():
+		return progress(args.train_progress, 120)
+
+	@app.get("/tournament")
+	def tournament_page():
+		return FileResponse(os.path.join(HERE, "static", "tournament.html"))
+
+	@app.get("/api/tournament")
+	def tournament_state():
+		return progress(args.tournament_progress, 60)
 
 	@app.get("/api/state")
 	def state():

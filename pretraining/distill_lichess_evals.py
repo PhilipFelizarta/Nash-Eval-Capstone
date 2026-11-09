@@ -206,6 +206,12 @@ def train(args):
 		initial_epoch = int(model.optimizer.iterations.numpy()) // steps
 		print(f"resuming from {last} at epoch {initial_epoch + 1}", flush=True)
 	callbacks = [keras.callbacks.ModelCheckpoint(last)]
+	if args.keep_epochs:
+		# Every epoch's model (plus the untrained one as epoch 0), e.g. for a round robin between checkpoints.
+		os.makedirs(args.keep_epochs, exist_ok=True)
+		if initial_epoch == 0:
+			model.save(os.path.join(args.keep_epochs, "epoch_00.keras"))
+		callbacks.append(keras.callbacks.ModelCheckpoint(os.path.join(args.keep_epochs, "epoch_{epoch:02d}.keras")))
 	if args.progress:
 		callbacks.append(Progress(args.progress))
 	model.fit(batches(tr, True), steps_per_epoch=steps, epochs=args.epochs, initial_epoch=initial_epoch,
@@ -231,6 +237,7 @@ def main():
 	t.add_argument("--batch", type=int, default=1024)
 	t.add_argument("--lr", type=float, default=2e-3)
 	t.add_argument("--val", type=int, default=20_480)  # a whole number of batches
+	t.add_argument("--keep-epochs", default=None, metavar="DIR", help="also save every epoch's model to DIR/epoch_XX.keras")
 	t.add_argument("--resume", action="store_true", help="continue from the per-epoch checkpoint next to --out")
 	t.add_argument("--progress", default=None, help="JSON file updated during training (for the play UI's /train page)")
 	args = parser.parse_args()

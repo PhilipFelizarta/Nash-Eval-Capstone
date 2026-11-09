@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nash-Eval: checkpoint round robin</title>
+<style>
+:root {
+	color-scheme: light;
+	--page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+	--grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+	--s1: #2a78d6; --track: #e1e0d9;
+	--pos: #2a78d6; --neg: #e34948; --mid: #f0efec;   /* diverging: row wins (blue) / row loses (red), gray = even */
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+		--grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+		--s1: #3987e5; --track: #2c2c2a;
+		--pos: #3987e5; --neg: #e66767; --mid: #383835;
+	}
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
+h1 { font-size: 16px; margin: 0 0 2px; }
+h2 { font-size: 13px; margin: 0 0 8px; color: var(--ink2); font-weight: 600; }
+.sub { color: var(--ink2); font-size: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+a { color: var(--s1); }
+.bar { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; margin: 6px 0 4px; }
+.bar > div { height: 100%; background: var(--s1); border-radius: 5px; transition: width .4s; }
+.row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink2); flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 14px; }
+table.hm { border-collapse: separate; border-spacing: 2px; font-size: 11px; font-variant-numeric: tabular-nums; }
+table.hm th { color: var(--ink2); font-weight: 600; padding: 2px 4px; white-space: nowrap; }
+table.hm td { width: 38px; height: 30px; text-align: center; border-radius: 4px; cursor: default; }
+table.hm td.diag { background: transparent; color: var(--muted); }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink2); margin-top: 8px; }
+.legend .ramp { width: 160px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--neg), var(--mid), var(--pos)); }
+svg.chart { display: block; width: 100%; }
+svg.chart text { font-size: 10px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+svg.chart text.lbl { fill: var(--ink2); font-size: 11px; }
+#tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); box-shadow: 0 4px 14px rgba(0,0,0,.15); border-radius: 6px; padding: 6px 9px; font-size: 12px; display: none; z-index: 10; white-space: nowrap; }
+details { font-size: 12px; } details table { border-collapse: collapse; margin-top: 6px; }
+details td, details th { padding: 3px 8px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+	<div class="card">
+		<h1>Checkpoint round robin: does training make it stronger?</h1>
+		<div class="sub" id="subtitle">waiting for the tournament…</div>
+		<div class="row" style="margin-top:10px"><span id="ptext"></span><span id="eta"></span></div>
+		<div class="bar"><div id="pbar" style="width:0"></div></div>
+		<div class="row"><span id="res"></span><span id="rate"></span></div>
+	</div>
+	<div class="grid2">
+		<div class="card">
+			<h2>Elo by training epoch (untrained net = 0)</h2>
+			<svg class="chart" id="cElo"></svg>
+			<div class="sub" id="eloNote"></div>
+		</div>
+		<div class="card">
+			<h2>MaxEnt Nash equilibrium of the meta-game</h2>
+			<svg class="chart" id="cNash"></svg>
+			<div class="sub" id="nashNote">Computed with core/nash.py once every game is played.</div>
+		</div>
+	</div>
+	<div class="card">
+		<h2>Score of row vs column (both colours)</h2>
+		<div id="hm"></div>
+		<div class="legend"><span>row loses</span><span class="ramp"></span><span>row wins</span><span style="margin-left:10px">numbers: row's score, 0–1</span></div>
+		<details><summary>Table view</summary><div id="tbl"></div></details>
+	</div>
+	<div class="sub">Each pair plays every opening twice, colours swapped, with the C++ MCTS at a fixed number of simulations per move. <a href="train">Training curves</a> · <a href="./">Play the engine</a></div>
+</div>
+<div id="tip"></div>
+<script>
+const $ = id => document.getElementById(id);
+const fmtInt = v => Math.round(v).toLocaleString("en-US");
+const dur = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : m ? `${m} min ${s % 60}s` : `${s}s`; };
+const short = n => n.replace(/^epoch_0?/, "ep ");
+let D = null;
+
+function showTip(html, e) {
+	const t = $("tip"); t.innerHTML = html; t.style.display = "block";
+	t.style.left = Math.min(e.clientX + 14, innerWidth - t.offsetWidth - 8) + "px"; t.style.top = (e.clientY + 14) + "px";
+}
+const hideTip = () => { $("tip").style.display = "none"; };
+
+function cellColor(v) {
+	if (v == null) return "transparent";
+	const k = Math.round(Math.min(1, Math.abs(v - 0.5) * 2) * 100);
+	return `color-mix(in oklab, ${v >= 0.5 ? "var(--pos)" : "var(--neg)"} ${k}%, var(--mid))`;
+}
+
+function heatmap() {
+	const n = D.models.length;
+	let h = `<table class="hm"><tr><th></th>${D.models.map(m => `<th>${short(m)}</th>`).join("")}</tr>`;
+	for (let a = 0; a < n; a++) {
+		h += `<tr><th style="text-align:right">${short(D.models[a])}</th>`;
+		for (let b = 0; b < n; b++) {
+			if (a === b) { h += `<td class="diag">–</td>`; continue; }
+			const v = D.score[a][b], strong = v != null && Math.abs(v - 0.5) > 0.3;
+			h += `<td data-a="${a}" data-b="${b}" style="background:${cellColor(v)};color:${strong ? "#fff" : "var(--ink)"}">${v == null ? "" : v.toFixed(2).replace(/^0/, "")}</td>`;
+		}
+		h += "</tr>";
+	}
+	$("hm").innerHTML = h + "</table>";
+	$("hm").onmousemove = e => {
+		const td = e.target.closest("td[data-a]"); if (!td) return hideTip();
+		const a = +td.dataset.a, b = +td.dataset.b, v = D.score[a][b], g = D.pair_games[a][b];
+		showTip(v == null ? `${D.models[a]} vs ${D.models[b]}: not played yet` : `<b>${D.models[a]} vs ${D.models[b]}</b><br>score ${(100 * v).toFixed(1)}% over ${g} games`, e);
+	};
+	$("hm").onmouseleave = hideTip;
+	$("tbl").innerHTML = `<table><tr><th>row \\ col</th>${D.models.map(m => `<th>${short(m)}</th>`).join("")}</tr>` +
+		D.models.map((m, a) => `<tr><th>${m}</th>${D.score[a].map(v => `<td>${v == null ? "–" : v.toFixed(3)}</td>`).join("")}</tr>`).join("") + "</table>";
+}
+
+function barChart(id, vals, opts) {
+	const el = $(id), W = el.clientWidth || 440, H = 200, L = 44, R = 10, T = 10, B = 24, n = vals.length;
+	const bw = Math.min(28, (W - L - R) / n - 6), xs = i => L + (i + 0.5) * (W - L - R) / n;
+	const ys = v => T + (1 - (v - opts.min) / (opts.max - opts.min)) * (H - T - B);
+	let s = `<svg class="chart" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+	for (const t of opts.ticks) s += `<line x1="${L}" x2="${W - R}" y1="${ys(t)}" y2="${ys(t)}" stroke="var(--grid)"/><text x="${L - 5}" y="${ys(t) + 3}" text-anchor="end">${opts.fmt(t)}</text>`;
+	s += `<line x1="${L}" x2="${W - R}" y1="${ys(opts.base)}" y2="${ys(opts.base)}" stroke="var(--axis)"/>`;
+	if (opts.line) s += `<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${vals.map((v, i) => `${xs(i)},${ys(v)}`).join(" ")}"/>`;
+	vals.forEach((v, i) => {
+		if (opts.line) s += `<circle cx="${xs(i)}" cy="${ys(v)}" r="4.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
+		else { const y0 = ys(opts.base), y = ys(v); s += `<rect x="${xs(i) - bw / 2}" y="${Math.min(y, y0)}" width="${bw}" height="${Math.max(1, Math.abs(y0 - y))}" rx="3" fill="var(--s1)"/>`; }
+		s += `<text x="${xs(i)}" y="${H - 8}" text-anchor="middle">${short(D.models[i])}</text>`;
+		s += `<rect class="hit" data-i="${i}" x="${xs(i) - (W - L - R) / n / 2}" y="${T}" width="${(W - L - R) / n}" height="${H - T - B}" fill="transparent"/>`;
+	});
+	const top = vals.reduce((b, v, i) => v > vals[b] ? i : b, 0);
+	s += `<text class="lbl" x="${xs(top)}" y="${ys(vals[top]) - 8}" text-anchor="middle">${opts.fmt(vals[top])}</text>`;
+	el.outerHTML = s + "</svg>";
+	const fresh = $(id);
+	fresh.addEventListener("mousemove", e => { const r = e.target.closest("rect.hit"); if (!r) return hideTip(); showTip(opts.tip(+r.dataset.i), e); });
+	fresh.addEventListener("mouseleave", hideTip);
+}
+
+let key = "";
+function render() {
+	const frac = D.games_done / D.games_total, rate = D.games_done / D.elapsed;
+	$("subtitle").textContent = `${D.models.length} checkpoints · ${D.openings} balanced openings × 2 colours per pair · ${D.sims} MCTS simulations per move · ` + (D.final ? "finished" : D.stale ? "not updating" : "running");
+	$("ptext").textContent = `${fmtInt(D.games_done)} / ${fmtInt(D.games_total)} games (${(100 * frac).toFixed(1)}%)`;
+	$("eta").textContent = D.final ? `done in ${dur(D.elapsed)}` : `${dur(D.elapsed)} elapsed` + (D.games_done > 20 ? ` · about ${dur((D.games_total - D.games_done) / rate)} left` : "");
+	$("pbar").style.width = (100 * frac) + "%";
+	const r = D.results;
+	$("res").textContent = `White wins ${fmtInt(r["1-0"])} · draws ${fmtInt(r["1/2-1/2"])} · Black wins ${fmtInt(r["0-1"])}`;
+	$("rate").textContent = `${fmtInt(D.evals / D.elapsed)} network evals/s · ${fmtInt(D.plies)} moves played`;
+	const k = JSON.stringify([D.games_done, D.final, document.body.clientWidth]);
+	if (k === key) return;
+	key = k;
+	heatmap();
+	if (D.elo) {
+		const lo = Math.min(0, ...D.elo), hi = Math.max(...D.elo), step = Math.max(100, Math.ceil((hi - lo) / 4 / 100) * 100);
+		const ticks = []; for (let t = Math.floor(lo / step) * step; t <= hi + step; t += step) ticks.push(t);
+		barChart("cElo", D.elo, { min: ticks[0], max: ticks[ticks.length - 1], ticks, base: 0, line: true, fmt: t => (t > 0 ? "+" : "") + Math.round(t),
+			tip: i => `<b>${D.models[i]}</b><br>${(D.elo[i] > 0 ? "+" : "") + Math.round(D.elo[i])} Elo vs the untrained net` + (i ? `<br>${Math.round(D.elo[i] - D.elo[i - 1]) >= 0 ? "+" : ""}${Math.round(D.elo[i] - D.elo[i - 1])} vs the previous epoch` : "") });
+		$("eloNote").textContent = D.final ? "Bradley–Terry fit over every game (colour ignored)." : "Provisional: fitted to the games played so far.";
+	} else $("cElo").outerHTML = `<svg class="chart" id="cElo" height="40"><text x="10" y="24">waiting for enough games</text></svg>`;
+	if (D.nash) {
+		barChart("cNash", D.nash, { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], base: 0, fmt: t => (100 * t).toFixed(0) + "%",
+			tip: i => `<b>${D.models[i]}</b><br>Nash probability ${(100 * D.nash[i]).toFixed(1)}%` });
+		$("nashNote").textContent = "MaxEnt Nash over the symmetrised, logit-transformed win-rate matrix (core/nash.py), as in the original tournaments.";
+	}
+}
+
+async function tick() {
+	try { const d = await (await fetch("api/tournament", { cache: "no-store" })).json(); if (d.models) { D = d; render(); } } catch (e) {}
+	setTimeout(tick, 3000);
+}
+addEventListener("resize", () => { key = ""; if (D) render(); });
+tick();
+</script>
+</body>
+</html>
