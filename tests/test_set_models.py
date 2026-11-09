@@ -14,9 +14,9 @@ if __name__ == "__main__":
 	# Load dataset
 	# Parameters
 	PGN_FILE = "archive_data/LumbrasGigaBase 2024.pgn"
-	MODEL_FOLDER = "models/final_model"
+	MODEL_FOLDER = os.getenv("MODEL_FOLDER", "models/final_model")
 	BATCH_SIZE = 64
-	MAX_BATCHES = 1000  # You can change this if needed
+	MAX_BATCHES = int(os.getenv("MAX_BATCHES", "1000"))  # 1000 batches is only ~800 games; raise it if memory allows
 
 	# Load test dataset once
 	print("⏳ Loading test set...")
@@ -50,15 +50,15 @@ if __name__ == "__main__":
 
 	results = []
 
-	loss_fn = SparseCategoricalCrossentropy(from_logits=True, reduction='none')
+	loss_fn = SparseCategoricalCrossentropy(from_logits=False, reduction='none')  # Models output softmax probabilities
 
 	for model_path in model_paths:
 		model_name = os.path.basename(model_path)
 		model = keras.models.load_model(model_path)
 
 		# Predict and evaluate
-		y_pred_logits = model.predict(x_all, batch_size=64, verbose=0)
-		y_pred = np.argmax(y_pred_logits, axis=-1)
+		y_pred_probs = model.predict(x_all, batch_size=64, verbose=0)
+		y_pred = np.argmax(y_pred_probs, axis=-1)
 
 		# Accuracy and metrics
 		acc = accuracy_score(y_all, y_pred)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 		weighted_acc = np.sum(correct * w_all) / np.sum(w_all)
 
 		# Compute per-sample loss (no reduction)
-		per_sample_loss = loss_fn(y_all, y_pred_logits).numpy()
+		per_sample_loss = loss_fn(y_all, y_pred_probs).numpy()
 		test_loss = np.mean(per_sample_loss)
 		weighted_loss = np.sum(per_sample_loss * w_all) / np.sum(w_all)
 

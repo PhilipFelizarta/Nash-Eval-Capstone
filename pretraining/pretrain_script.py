@@ -47,9 +47,10 @@ if __name__ == "__main__":
 		f"models/{model_name}/{model_name}" + "_{epoch:03d}.h5",
 		save_freq="epoch", save_weights_only=False
 	)
-	csv_logger = CSVLogger("logs/training_log.csv", append=True)
+	log_file = f"logs/{model_name}_training_log.csv"
+	csv_logger = CSVLogger(log_file, append=True)
 	plot_callback = model_framework.TrainingPlotCallback(
-		save_interval=1, plot_path=f"figures/training/{model_name}_training.png"
+		save_interval=1, plot_path=f"figures/training/{model_name}_training.png", log_file=log_file
 	)
 
 	history = model.fit(

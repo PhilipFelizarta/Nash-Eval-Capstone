@@ -15,26 +15,28 @@ import core.chess_precomputed as chess_precomputed
 
 def fast_fen_to_example(fen):
 	"""
-	Converts a FEN string into a (8, 8, 19) tensor where:
-		- First 7 channels: Current player's pieces
-		- Channels 8 & 9: Current player's kingside & queenside castling rights
-		- Next 7 channels: Opponent's pieces
-		- Channels 17 & 18: Opponent's kingside & queenside castling rights
-		- Channel 19 encodes a bit for the en passant square
-		- Board flips when black to move to maintain hero/villian representation.
+	Converts a FEN string into a (8, 8, 36) tensor. Hero = side to move, villain = opponent.
+	Channels are 0-indexed:
+		- 0-6: Hero pieces (P, N, light-square B, dark-square B, R, Q, K)
+		- 7 & 8: Hero kingside & queenside castling rights
+		- 9-15: Villain pieces (same order)
+		- 16 & 17: Villain kingside & queenside castling rights
+		- 18: En passant square
+		- Ranks are flipped when black is to move, so the hero always plays "up" the board.
 
-	Extra encoding layers.
-		Channel 20-35 encodes peusdo-legal move maps for each piece type.
+	Move maps (see chess_precomputed.generate_pseudo_legal_moves):
+		- 19-25: Hero moves/attacks (P pushes, N, B, D, R, Q, K)
+		- 26-32: Villain moves/attacks (same order)
+		- 33 & 34: Hero & villain pawn attacks
 
 	Engineered Features
-		Channel 36 encodes material imbalance
+		- 35: Material imbalance (hero - villain) / 40.2
 
 	Args:
 		fen (str): Chess position in FEN notation.
 
 	Returns:
-		np.ndarray: (8, 8, 19) tensor representation of the board. ---> directly to fen
-		The next 14 channels encode the psuedo legal moves. 20 -> 35
+		np.ndarray: (8, 8, 36) tensor representation of the board.
 	"""
 	tensor = np.zeros((8, 8, 36), dtype=np.float32)
 
@@ -50,11 +52,6 @@ def fast_fen_to_example(fen):
 
 	# Identify whose turn it is
 	is_white_turn = (turn == 'w')
-
-	piece_positions = {
-		"P_white": [], "N_white": [], "B_white": [], "D_white": [], "R_white": [], "Q_white": [], "K_white": [],
-		"P_black": [], "N_black": [], "B_black": [], "D_black": [], "R_black": [], "Q_black": [], "K_black": []
-	}
 
 	material_hero = 0
 	material_villain = 0
@@ -84,20 +81,14 @@ def fast_fen_to_example(fen):
 								char = "D" if square_sum_cond else "B"
 							else:
 								char = "d" if square_sum_cond else "b"
-					
-					is_white_piece = char.isupper()
-			
+
 					if (char.isupper() and is_white_turn) or (char.islower() and not is_white_turn):
 						tensor[row_idx, col_idx, piece_index] = 1  # Current player
 						material_hero += piece_values.get(char.upper(), 0)
 					else:
 						tensor[row_idx, col_idx, piece_index + opponent_offset] = 1  # Opponent
 						material_villain += piece_values.get(char.upper(), 0)
-					
-					# Store piece positions for move generation
-					piece_key = f"{char.upper()}_{'white' if is_white_piece else 'black'}"
-					piece_positions[piece_key].append((row_idx, col_idx))
-		
+
 				col_idx += 1
 
 	# Encode castling rights
@@ -115,16 +106,17 @@ def fast_fen_to_example(fen):
 		tensor[row, col, 18] = 1  # Mark en passant square
 
 	if not is_white_turn:
-		tensor = np.flip(tensor, axis=0)  # Flip rows (ranks)
-	
-	tensor = chess_precomputed.generate_pseudo_legal_moves(tensor, piece_positions)
+		tensor = np.flip(tensor, axis=0).copy()  # Flip rows (ranks)
+
+	# Move maps are built from the (flipped) piece planes so they line up with them
+	tensor = chess_precomputed.generate_pseudo_legal_moves(tensor)
 
 	tensor[:, :, 35] = (material_hero -  material_villain) / 40.2 # Material imbalance feature
 	return tensor
 
 def tensor_to_fen(tensor, is_white_turn=True):
 	"""
-	Reconstructs a FEN string from a (8,8,19) tensor.
+	Reconstructs a FEN string from the first 19 channels of an encoded tensor.
 	
 	Args:
 		tensor (np.ndarray): (8, 8, 19) tensor representation of the board.
@@ -194,14 +186,15 @@ def tensor_to_fen(tensor, is_white_turn=True):
 		fen_rows.append(fen_row)
 
 	# Castling rights reconstruction
+	white_planes, black_planes = ((7, 8), (16, 17)) if is_white_turn else ((16, 17), (7, 8))
 	castling = ""
-	if tensor[:, :, 7].any():  # White kingside
+	if tensor[:, :, white_planes[0]].any():  # White kingside
 		castling += "K"
-	if tensor[:, :, 8].any():  # White queenside
+	if tensor[:, :, white_planes[1]].any():  # White queenside
 		castling += "Q"
-	if tensor[:, :, 16].any():  # Black kingside
+	if tensor[:, :, black_planes[0]].any():  # Black kingside
 		castling += "k"
-	if tensor[:, :, 17].any():  # Black queenside
+	if tensor[:, :, black_planes[1]].any():  # Black queenside
 		castling += "q"
 	castling = castling if castling else "-"
 

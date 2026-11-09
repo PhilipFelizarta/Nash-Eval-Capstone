@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import chess.pgn
 import zstandard as zstd
@@ -19,69 +20,91 @@ def extract_game_result(headers):
 		return 0  # Draw
 	return None  # Ignore incomplete games
 
-def pgn_zst_generator(zst_file, batch_size=32):
+def game_positions(game):
+	"""
+	Yields (fen, label, importance) for every position before a move in a finished game.
+
+	label is from the side to move's point of view: 0 = went on to win, 1 = draw, 2 = lost.
+	importance weights positions near the end of the game more heavily.
+	"""
+	game_result = extract_game_result(game.headers)
+	if game_result is None:  # Skip incomplete games
+		return
+
+	moves = list(game.mainline_moves())
+	ply_count = len(moves)
+	board = game.board()
+
+	for current_ply, move in enumerate(moves):
+		relative_modifier = -1 if board.turn else 1
+		yield board.fen(), int((game_result * relative_modifier) + 1), GAMMA ** (ply_count - current_ply)
+		board.push(move)
+
+def encode_batch(samples):
+	"""Encodes a list of (fen, label, importance) samples into model inputs."""
+	fens, labels, importance_weights = zip(*samples)
+	tensors = np.array([chess_env.fast_fen_to_example(fen) for fen in fens])
+	return tensors, np.array(labels), np.array(importance_weights, dtype=np.float32)
+
+def pgn_zst_generator(zst_file, batch_size=32, shuffle_buffer=200_000, skip_games=0, seed=None, log_every=100_000):
 	"""
 	Streams PGN data from a .zst file using a single-threaded generator.
+
+	Positions (not batches) go through a shuffle buffer before batching, so a batch mixes
+	positions from thousands of games instead of being consecutive plies of one game.
+	The buffer holds FENs and is only encoded at batch time, so 200k positions is ~50 MB.
+
+	skip_games skips that many games from the start of the file, so a resumed run can
+	continue on games the previous run has not seen.
 	"""
+	rng = random.Random(seed)
+	buffer = []
+	batch = []
+
 	dctx = zstd.ZstdDecompressor()
 	with open(zst_file, "rb") as compressed:
 		with dctx.stream_reader(compressed, read_across_frames=True) as reader:
 			text_stream = io.TextIOWrapper(reader, encoding="utf-8")
 
-			game_data = []
-			labels = []
-			importance_weights = []
+			for _ in range(skip_games):
+				if not chess.pgn.skip_game(text_stream):
+					break  # End of file
 
+			games_read = skip_games
 			while True:
 				game = chess.pgn.read_game(text_stream)
 				if game is None:
 					break  # End of file
 
-				board = game.board()
-				node = game
-				game_result = extract_game_result(game.headers)
+				games_read += 1
+				if games_read % log_every == 0:
+					print(f"\n[data] games consumed (use as SKIP_GAMES to resume past them): {games_read}")
 
-				if game_result is None:  # Skip incomplete games
-					continue  
+				for sample in game_positions(game):
+					if len(buffer) < shuffle_buffer:
+						buffer.append(sample)
+						continue
 
-				# Compute total number of plies in the game
-				ply_count = sum(1 for _ in game.mainline_moves())  # Efficient ply counter
-				current_ply = 0
-
-				# Iterate through only mainline moves
-				for move in game.mainline_moves():
-					fen = board.fen()
-					turn = board.turn
-					relative_modifier = -1 if turn else 1
-
-					# Convert FEN to tensor
-					tensor = chess_env.fast_fen_to_example(fen)
-
-					# Importance weight based on distance to final move
-					importance = GAMMA ** (ply_count - current_ply)
-
-					# Store in batch
-					game_data.append(tensor)
-					labels.append(int((game_result * relative_modifier) + 1))  
-					importance_weights.append(importance)
-
-					# Move forward
-					board.push(move)
-					current_ply += 1
+					# Swap a random buffered position out for the new one
+					i = rng.randrange(shuffle_buffer)
+					batch.append(buffer[i])
+					buffer[i] = sample
 
 					# Yield batch when ready
-					if len(game_data) >= batch_size:
-						yield np.array(game_data), np.array(labels), np.array(importance_weights)
-						game_data, labels, importance_weights = [], [], []
+					if len(batch) >= batch_size:
+						yield encode_batch(batch)
+						batch = []
 
-			# Yield remaining data
-			if game_data:
-				yield np.array(game_data), np.array(labels), np.array(importance_weights)
+	# Yield remaining data
+	rng.shuffle(buffer)
+	batch.extend(buffer)
+	for start in range(0, len(batch), batch_size):
+		yield encode_batch(batch[start:start + batch_size])
 
 
-def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimental.AUTOTUNE, buffer_size=128):
+def get_tf_dataset(zst_file, batch_size=32, shuffle_buffer=200_000, skip_games=0, num_parallel_calls=tf.data.experimental.AUTOTUNE):
 	"""
-	Returns a TensorFlow Dataset streaming from a multi-threaded PGN generator.
+	Returns a TensorFlow Dataset streaming shuffled batches from a PGN generator.
 	"""
 	output_signature = (
 		tf.TensorSpec(shape=(None, 8, 8, 36), dtype=tf.float32),  # Input tensor batch
@@ -90,13 +113,12 @@ def get_tf_dataset(zst_file, batch_size=32, num_parallel_calls=tf.data.experimen
 	)
 
 	dataset = tf.data.Dataset.from_generator(
-		lambda: pgn_zst_generator(zst_file, batch_size),
+		lambda: pgn_zst_generator(zst_file, batch_size, shuffle_buffer=shuffle_buffer, skip_games=skip_games),
 		output_signature=output_signature
 	)
 
-	# Parallel loading and prefetching for speedup
-	dataset = dataset.shuffle(buffer_size) \
-					 .map(lambda x, y, w: (tf.cast(x, tf.float32), y, w),
+	# Shuffling happens per position inside the generator; here we only cast and prefetch
+	dataset = dataset.map(lambda x, y, w: (tf.cast(x, tf.float32), y, w),
 						  num_parallel_calls=num_parallel_calls) \
 					 .prefetch(tf.data.experimental.AUTOTUNE)
 
@@ -160,27 +182,10 @@ def reversed_pgn_generator(pgn_file, batch_size=32, max_batches=100000):
 		if game is None:
 			continue
 
-		board = game.board()
-		game_result = extract_game_result(game.headers)
-		if game_result is None:
-			continue
-
-		ply_count = sum(1 for _ in game.mainline_moves())
-		current_ply = 0
-
-		for move in game.mainline_moves():
-			fen = board.fen()
-			turn = board.turn
-			relative_modifier = -1 if turn else 1
-			tensor = chess_env.fast_fen_to_example(fen)
-			importance = GAMMA ** (ply_count - current_ply)
-
-			game_data.append(tensor)
-			labels.append(int((game_result * relative_modifier) + 1))
+		for fen, label, importance in game_positions(game):
+			game_data.append(chess_env.fast_fen_to_example(fen))
+			labels.append(label)
 			importance_weights.append(importance)
-
-			board.push(move)
-			current_ply += 1
 
 			if len(game_data) >= batch_size:
 				yield np.array(game_data), np.array(labels), np.array(importance_weights)

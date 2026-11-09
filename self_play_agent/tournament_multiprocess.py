@@ -65,12 +65,12 @@ def play_matchup(idx_a, idx_b, model_a, model_b, matchup_folder, M, temp):
 
 	for i in range(M):
 		game_path = os.path.join(matchup_folder, f"game_{i}.pgn")
-		result = self_play_game_stochastic(model_a, model_b, game_path, max_moves=100, starting_fen=starting_fen[i], temp=temp)
+		result = self_play_game_stochastic(model_a, model_b, game_path, max_moves=100, starting_fen=starting_fen[i % len(starting_fen)], temp=temp)
 
 		if result == "1-0":
 			results["wins"] += 1
-		elif result == "1/2-1/2":
-			results["wins"] += 0.5
+		elif result != "0-1":
+			results["wins"] += 0.5  # Draws and games stopped at max_moves ("*") count as draws
 		results["total"] += 1
 
 	return results

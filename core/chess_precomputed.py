@@ -81,61 +81,54 @@ def precompute_psuedo_moves():
 precompute_psuedo_moves()
 
 
-def generate_pseudo_legal_moves(tensor, piece_positions):
-	""" Populates tensor with precomputed pseudo-legal moves for both White and Black using NumPy. """
+# Move planes are hero-relative (hero = side to move) and use the tensor's own,
+# already-flipped coordinates, so the hero's pawns always move toward row 0.
+HERO_MOVE_PLANES = {"P": 19, "N": 20, "B": 21, "D": 22, "R": 23, "Q": 24, "K": 25}
+VILLAIN_MOVE_PLANES = {piece: plane + 7 for piece, plane in HERO_MOVE_PLANES.items()}
+PAWN_ATTACK_PLANES = (33, 34)  # (Hero, Villain)
+PIECE_CHANNELS = {"P": 0, "N": 1, "B": 2, "D": 3, "R": 4, "Q": 5, "K": 6}
+SLIDING_TABLES = {"B": "B", "D": "B", "R": "R", "Q": "Q"}  # Both bishop colours slide like a bishop
 
-	# Move plane mapping (same for both sides)
-	move_channels = {
-		"P": (19, 26),  # Pawn: (White Plane, Black Plane)
-		"P_attack": (33, 34),  # Pawn attack planes
-		"N": (20, 27),  # Knight
-		"B": (21, 28),  # Light-Square Bishop
-		"D": (22, 29),  # Dark-Square Bishop
-		"R": (23, 30),  # Rook
-		"Q": (24, 31),  # Queen
-		"K": (25, 32),  # King
-	}
 
-	def batch_update(tensor, positions, move_table, plane):
-		""" Update multiple move positions at once using NumPy indexing. """
-		if not positions:
-			return
+def generate_pseudo_legal_moves(tensor):
+	"""
+	Fills move planes 19-34 from the piece planes already in the tensor.
 
-		indices = np.array([r * 8 + c for r, c in positions if (0 <= r < 8 and 0 <= c < 8)])
-		valid_indices = indices[indices < 64]  # Ensure indices stay within bounds
+	Knight, king, slider and pawn attack planes mark every square the piece attacks;
+	slider rays stop at (and include) the first occupied square. Pawn push planes only
+	mark empty squares, and a blocked single push also blocks the double push.
+	"""
+	occupied = tensor[:, :, 0:7].any(axis=2) | tensor[:, :, 9:16].any(axis=2)
 
-		all_moves = []
-		for idx in valid_indices:
-			if idx in move_table:
-				for move_list in move_table[idx]:  # Handle nested lists properly
-					all_moves.extend(move_list)  # Flatten
+	sides = (
+		(0, HERO_MOVE_PLANES, PAWN_ATTACK_PLANES[0], True),  # Hero pawns move toward row 0
+		(9, VILLAIN_MOVE_PLANES, PAWN_ATTACK_PLANES[1], False),
+	)
 
-		if not all_moves:
-			return
+	for channel_offset, move_planes, attack_plane, toward_row_0 in sides:
+		for piece, channel in PIECE_CHANNELS.items():
+			plane = move_planes[piece]
+			rows, cols = np.nonzero(tensor[:, :, channel + channel_offset])
 
-		moves = np.array(all_moves, dtype=np.int32)
-		if moves.ndim == 1:  # If `moves` is a 1D array, reshape it to (N, 2)
-			moves = moves.reshape(-1, 2)
-
-		valid_moves = moves[(moves[:, 0] >= 0) & (moves[:, 0] < 8) & (moves[:, 1] >= 0) & (moves[:, 1] < 8)]
-
-		if valid_moves.size > 0:
-			tensor[valid_moves[:, 0], valid_moves[:, 1], plane] = 1
-
-	# Process Knights
-	batch_update(tensor, piece_positions.get("N_white", []), KNIGHT_MOVES, move_channels["N"][0])
-	batch_update(tensor, piece_positions.get("N_black", []), KNIGHT_MOVES, move_channels["N"][1])
-
-	# Process Kings
-	batch_update(tensor, piece_positions.get("K_white", []), KING_MOVES, move_channels["K"][0])
-	batch_update(tensor, piece_positions.get("K_black", []), KING_MOVES, move_channels["K"][1])
-
-	# Process Pawns
-	batch_update(tensor, piece_positions.get("P_white", []), PAWN_MOVES[True], move_channels["P"][0])
-	batch_update(tensor, piece_positions.get("P_black", []), PAWN_MOVES[False], move_channels["P"][1])
-
-	# Process Pawn Attacks
-	batch_update(tensor, piece_positions.get("P_white", []), PAWN_ATTACKS[True], move_channels["P_attack"][0])
-	batch_update(tensor, piece_positions.get("P_black", []), PAWN_ATTACKS[False], move_channels["P_attack"][1])
+			for square in (int(r) * 8 + int(c) for r, c in zip(rows, cols)):
+				if piece == "P":
+					for r, c in PAWN_ATTACKS[toward_row_0][square]:
+						tensor[r, c, attack_plane] = 1
+					for r, c in PAWN_MOVES[toward_row_0].get(square, []):
+						if occupied[r, c]:
+							break
+						tensor[r, c, plane] = 1
+				elif piece == "N":
+					for r, c in KNIGHT_MOVES[square]:
+						tensor[r, c, plane] = 1
+				elif piece == "K":
+					for r, c in KING_MOVES[square]:
+						tensor[r, c, plane] = 1
+				else:
+					for ray in SLIDING_MOVES[SLIDING_TABLES[piece]][square]:
+						for r, c in ray:
+							tensor[r, c, plane] = 1
+							if occupied[r, c]:
+								break
 
 	return tensor

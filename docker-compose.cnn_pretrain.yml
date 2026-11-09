@@ -27,5 +27,11 @@ services:
       - TF_GPU_ALLOCATOR=cuda_malloc_async  
       - N_FILTERS=512
       - N_BLOCKS=4
+      - LR=3e-4
+      # To continue training on unseen games, set RESUME_FROM to a checkpoint and
+      # SKIP_GAMES to the last "[data] games consumed" count from the previous run's log.
+      # - RESUME_FROM=models/RESNET_36p_4x512/RESNET_36p_4x512_022.h5
+      # - RESUME_LR=3e-5
+      # - SKIP_GAMES=0
     command: ["python", "/app/script.py"] 
     working_dir: /app
